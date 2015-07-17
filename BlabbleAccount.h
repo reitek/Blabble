@@ -110,7 +110,11 @@ public:
 	/*! @Brief Called by PjsuaManager when the media state of a call in this account changes.
 	 */
 	void OnCallMediaState(pjsua_call_id call_id);
-	
+
+	/*! @Brief Called by PjsuaManager when the state of a transaction within a call in this account changes.
+	*/
+	void OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e);
+
 	/*! @Brief Called by PjsuaManager when a call in this account has transfered.
 	 */
 	bool OnCallTransferStatus(pjsua_call_id call_id, int status);
@@ -145,6 +149,9 @@ public:
 	void set_default_identity(const std::string &i) { default_identity = i; }
 	PjsuaManagerPtr GetManager();
 
+	// REITEK: Proxy URL
+	void set_proxyURL(const std::string& s) { proxyURL_ = s; }
+
 private:
 	pjsua_acc_id id_;
 	std::string server_; //!< Server's IP or DNS name
@@ -163,6 +170,9 @@ private:
 
 	BlabbleAccountPtr get_shared() { return boost::static_pointer_cast<BlabbleAccount>(this->shared_from_this()); }
 	BlabbleCallPtr FindCall(pjsua_call_id call_id);
+
+	// REITEK: Proxy URL
+	std::string proxyURL_;
 };
 
 #endif // H_BlabbleAccount

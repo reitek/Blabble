@@ -11,19 +11,18 @@ set (CMAKE_BACKWARDS_COMPATIBILITY 2.6)
 Project(${PLUGIN_NAME})
 
 file (GLOB GENERAL RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-    [^.]*.cpp
     [^.]*.h
+	[^.]*.c	
+	[^.]*.cpp
     [^.]*.cmake
     )
 
 if (WIN32)
 INCLUDE_DIRECTORIES(
 	${PLUGIN_INCLUDE_DIRS}
-	./external/pjsip/pjlib/include
-	./external/pjsip/pjlib-util/include
-	./external/pjsip/pjmedia/include
-	./external/pjsip/pjsip/include
-	./external/pjsip/pjnath/include
+	\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
+	\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
+	\\..\\..\\..\\..\\env\\Win32\\include\\curl
 )
 
 SET(PLUGIN_INTERNAL_DEPS 
@@ -32,7 +31,6 @@ SET(PLUGIN_INTERNAL_DEPS
 	netapi32.lib
 	mswsock.lib
 	ws2_32.lib
-	$(MSBuildProjectDirectory)\\..\\..\\..\\projects\\Blabble\\external\\libpjproject-2.1.0-Release.lib
 )
 
 ADD_DEFINITIONS(-DPJ_WIN32=1)
@@ -97,6 +95,40 @@ SET( SOURCES
     ${GENERAL}
     ${GENERATED}
     )
+
+# REITEK: Added useful macros (Begin)
+
+############################################################################################################
+# Append str to a string property of a target.
+# target:      string: target name.
+# property:            name of target’s property. e.g: COMPILE_FLAGS, or LINK_FLAGS
+# str:         string: string to be appended to the property
+macro(my_append_target_property target property str)
+  get_target_property(current_property ${target} ${property})
+  if(NOT current_property) # property non-existent or empty
+      set_target_properties(${target} PROPERTIES ${property} ${str})
+  else()
+      set_target_properties(${target} PROPERTIES ${property} "${current_property} ${str}")
+  endif()
+endmacro(my_append_target_property)
+
+############################################################################################################
+# Add/append compile flags to a target.
+# target: string: target name.
+# flags : string: compile flags to be appended
+macro(my_add_compile_flags target flags)
+  my_append_target_property(${target} COMPILE_FLAGS ${flags})
+endmacro(my_add_compile_flags)
+
+############################################################################################################
+# Add/append link flags to a target.
+# target: string: target name.
+# flags : string: link flags to be appended
+macro(my_add_link_flags target flags)
+  my_append_target_property(${target} LINK_FLAGS ${flags})
+endmacro(my_add_link_flags)
+
+# REITEK: Added useful macros (End)
 
 # This will include Win/projectDef.cmake, X11/projectDef.cmake, Mac/projectDef 
 # depending on the platform

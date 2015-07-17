@@ -16,6 +16,8 @@ Copyright 2012 Andrew Ofisher
 #include "BlabbleAudioManager.h"
 #include "FBWriteOnlyProperty.h"
 #include "BlabbleLogging.h"
+#include "boost/lexical_cast.hpp"
+#include <string>
 
 BlabbleAccount::BlabbleAccount(PjsuaManagerPtr manager) :  
 	ringing_call_(0), pjsua_manager_(manager), id_(-1), timeout_(60), retry_(15), use_tls_(false)
@@ -33,6 +35,9 @@ BlabbleAccount::BlabbleAccount(PjsuaManagerPtr manager) :
 
 	registerProperty("onIncomingCall", make_write_only_property(this, &BlabbleAccount::set_on_incoming_call));
 	registerProperty("onRegState", make_write_only_property(this, &BlabbleAccount::set_on_reg_state));
+
+	//new features
+	registerMethod("setProxy", make_method(this, &BlabbleAccount::set_proxyURL));
 }
 
 void BlabbleAccount::Register()
@@ -45,6 +50,11 @@ void BlabbleAccount::Register()
 	{
 		if (server_.empty())
 			throw std::runtime_error("Attempt to register account with no server host set.");
+
+		// REITEK: Check validity of proxy URL
+		if (!proxyURL_.empty() && (pjsua_verify_sip_url(proxyURL_.c_str()) != 0)) {
+			throw std::runtime_error("Attempt to register account using invalid proxyURL");
+		}
 
 		PjsuaManagerPtr manager = GetManager();
 		pj_status_t status;
@@ -69,6 +79,14 @@ void BlabbleAccount::Register()
 			acc_cfg.cred_info[0].username = pj_str(const_cast<char*>(username_.c_str()));
 			acc_cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
 			acc_cfg.cred_info[0].data = pj_str(const_cast<char*>(password_.c_str()));
+		}
+
+		// REITEK: Disable re-INVITE/UPDATE when more than one codec is received
+		acc_cfg.lock_codec = PJ_FALSE;
+
+		// REITEK: Set proxy URL
+		if (!proxyURL_.empty()) {
+			acc_cfg.proxy[acc_cfg.proxy_cnt++] = pj_str(const_cast<char *>(proxyURL_.c_str()));
 		}
 
 		status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &id_);
@@ -136,21 +154,33 @@ bool BlabbleAccount::OnIncomingCall(pjsua_call_id call_id, pjsip_rx_data *rdata)
 		cid = cid.substr(s, e-s);
 
 	BlabbleCallPtr call = boost::make_shared<BlabbleCall>(get_shared());
-	if (call->RegisterIncomingCall(call_id)) 
+
+	if (!call->RegisterIncomingCall(call_id))
+		return false;
+
 	{
-		{
-			boost::recursive_mutex::scoped_lock lock(this->calls_mutex_);
-			calls_.push_back(call);
-		}
-		ringing_call_ = call->id();
-
-		if (on_incoming_call_)
-			on_incoming_call_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(call))(BlabbleAccountWeakPtr(get_shared())));
-
-		return true;
+		boost::recursive_mutex::scoped_lock lock(this->calls_mutex_);
+		calls_.push_back(call);
 	}
 
-	return false;
+	// REITEK: !!! The call id is saved even though the call is immediately answered
+	ringing_call_ = call->id();
+
+	if (on_incoming_call_)
+		on_incoming_call_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(call))(BlabbleAccountWeakPtr(get_shared())));
+
+	if (!call->HandleIncomingCall(rdata))
+	{
+		//Error occurred
+		{
+			boost::recursive_mutex::scoped_lock lock(this->calls_mutex_);
+			calls_.remove(call);
+		}
+
+		return false;
+	}
+
+	return true;
 }
 
 void BlabbleAccount::OnCallState(pjsua_call_id call_id, pjsip_event *e)
@@ -162,8 +192,9 @@ void BlabbleAccount::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	} 
 	else
 	{
-		BLABBLE_LOG_DEBUG("Received call state change event for unknown PJSIP call id: "
-			<< call_id << ", on PJSIP account id: " << id_);
+		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id) +", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		BlabbleLogging::blabbleLog(0,str.c_str(),0);
+		//BLABBLE_LOG_DEBUG("Received call state change event for unknown PJSIP call id: " << call_id << ", on PJSIP account id: " << id_);
 	}
 }
 
@@ -174,9 +205,9 @@ bool BlabbleAccount::OnCallTransferStatus(pjsua_call_id call_id, int status)
 	{
 		return call->OnCallTransferStatus(status);
 	}
-	
-	BLABBLE_LOG_DEBUG("Received call transfer status for unknown PJSIP call id: "
-		<< call_id << ", on PJSIP account id: " << id_);
+	std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_DEBUG("Received call transfer status for unknown PJSIP call id: " << call_id << ", on PJSIP account id: " << id_);
 
 	//Stop getting notifications since we don't even have this call
 	return true;
@@ -188,6 +219,28 @@ void BlabbleAccount::OnCallMediaState(pjsua_call_id call_id)
 	if (call)
 	{
 		call->OnCallMediaState();
+	}
+	else
+	{
+		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_DEBUG("Received call media state change event for unknown PJSIP call id: "<< call_id << ", on PJSIP account id: " << id_);
+	}
+}
+
+// REITEK: Method to handle transaction state changes
+void BlabbleAccount::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e)
+{
+	BlabbleCallPtr call = FindCall(call_id);
+	if (call)
+	{
+		call->OnCallTsxState(call_id, tsx, e);
+	}
+	else
+	{
+		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_DEBUG("Received transaction state change event for unknown PJSIP call id: "<< call_id << ", on PJSIP account id: " << id_);
 	}
 }
 

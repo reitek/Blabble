@@ -37,12 +37,13 @@ BlabbleAudioManager::BlabbleAudioManager(const std::string& wavPath) :
 		in_ring_slot_ = -1;
 		in_ring_player_ = -1;
 
-		std::string path = 
-//#if WIN32
-//				wavPath + "\\ringtone.wav";
-//#else
-				wavPath + "/ringtone.wav";
-//#endif
+		// REITEK: !!! TODO: Make it configurable from "outside"
+ 
+#if defined(XP_WIN)
+		std::string path = wavPath + "\\ringtone.wav";
+#elif defined(XP_LINUX)
+		std::string path = wavPath + "/ringtone.wav";
+#endif
 		pj_str_t ring_file = pj_str(const_cast<char*>(path.c_str()));
 
 		if (pjsua_player_create(&ring_file, 0, &in_ring_player_) == PJ_SUCCESS)

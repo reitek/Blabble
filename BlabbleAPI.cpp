@@ -16,6 +16,7 @@ Copyright 2012 Andrew Ofisher
 #include "PjsuaManager.h"
 #include "BlabbleAudioManager.h"
 #include "BlabbleLogging.h"
+#include <string>
 
 BlabbleAPIInvalid::BlabbleAPIInvalid(const char* err)
 { 
@@ -31,6 +32,7 @@ BlabbleAPI::BlabbleAPI(const FB::BrowserHostPtr& host, const PjsuaManagerPtr& ma
 	registerMethod("stopWav", make_method(this, &BlabbleAPI::StopWav));
 	registerMethod("log", make_method(this, &BlabbleAPI::Log));
 	registerProperty("tlsEnabled", make_property(this, &BlabbleAPI::has_tls));
+	
 
 	registerMethod("getAudioDevices", make_method(this, &BlabbleAPI::GetAudioDevices));
 	registerMethod("setAudioDevice", make_method(this, &BlabbleAPI::SetAudioDevice));
@@ -38,6 +40,18 @@ BlabbleAPI::BlabbleAPI(const FB::BrowserHostPtr& host, const PjsuaManagerPtr& ma
 	registerMethod("getVolume", make_method(this, &BlabbleAPI::GetVolume));
 	registerMethod("setVolume", make_method(this, &BlabbleAPI::SetVolume));
 	registerMethod("getSignalLevel", make_method(this, &BlabbleAPI::GetSignalLevel));
+	
+	//Nuove Features
+	registerProperty("version", make_property(this, &BlabbleAPI::getVersion));
+	registerMethod("getLogAD", make_method(this, &BlabbleAPI::getLogAD));
+	registerMethod("writeLogAD", make_method(this, &BlabbleAPI::writeLogAD));
+	registerMethod("setLogDimension", make_method(this, &BlabbleAPI::setLogDimension));
+	registerMethod("setLogNumber", make_method(this, &BlabbleAPI::setLogNumber));
+	registerMethod("getLogDimension", make_method(this, &BlabbleAPI::getLogDimension));
+	registerMethod("getLogNumber", make_method(this, &BlabbleAPI::getLogNumber));
+	registerMethod("logSender", make_method(this, &BlabbleAPI::ZipSender));
+	registerMethod("setCodecPriority", make_method(this, &BlabbleAPI::SetCodecPriority));
+	registerMethod("setLogPath", make_method(this, &BlabbleAPI::setLogPath));
 }
 
 BlabbleAPI::~BlabbleAPI()
@@ -52,9 +66,10 @@ BlabbleAPI::~BlabbleAPI()
 	accounts_.clear();
 }
 
-void BlabbleAPI::Log(int level, const std::wstring& msg)
+void BlabbleAPI::Log(int level, const std::string msg)
 {
-	BLABBLE_JS_LOG(level, msg);
+	BlabbleLogging::blabbleLog(0, msg.c_str(), 0);
+	//BLABBLE_JS_LOG(level, msg.c_str());
 }
 
 BlabbleAccountWeakPtr BlabbleAPI::CreateAccount(const FB::VariantMap &params)
@@ -95,7 +110,14 @@ BlabbleAccountWeakPtr BlabbleAPI::CreateAccount(const FB::VariantMap &params)
 		{
 			account->set_on_reg_state(iter->second.cast<FB::JSObjectPtr>());
 		}
-		
+
+		// REITEK: If specified, set proxy URL for the new account (its validity is checked within the Register() method)
+		if ((iter = params.find("proxyURL")) != params.end() &&
+			iter->second.is_of_type<std::string>())
+		{
+			account->set_proxyURL(iter->second.cast<std::string>());
+		}
+
 		account->Register();
 	}
 	catch (const std::exception &e)
@@ -186,8 +208,11 @@ bool BlabbleAPI::SetAudioDevice(int capture, int playback)
 
 FB::VariantMap BlabbleAPI::GetVolume()
 {
+#if 0
 	pjmedia_conf_port_info info;
+#endif
 	FB::VariantMap map;
+#if 0
 	pj_status_t status = pjmedia_conf_get_port_info(pjsua_var.mconf, 0, &info);
 	if (status == PJ_SUCCESS)
 	{
@@ -195,6 +220,20 @@ FB::VariantMap BlabbleAPI::GetVolume()
 		map["incomingVolume"] = ((float)info.tx_adj_level) / 128 + 1;
 	} 
 	else 
+	{
+		map["error"] = status;
+	}
+#endif
+
+	// REITEK: Use PJSUA API to get the current volume
+	pjsua_conf_port_info info;
+	pj_status_t status = pjsua_conf_get_port_info(0, &info);
+	if (status == PJ_SUCCESS)
+	{
+		map["outgoingVolume"] = info.rx_level_adj;
+		map["incomingVolume"] = info.tx_level_adj;
+	}
+	else
 	{
 		map["error"] = status;
 	}
@@ -208,6 +247,7 @@ void BlabbleAPI::SetVolume(FB::variant outgoingVolume, FB::variant incomingVolum
 	{
 		pjsua_conf_adjust_rx_level(0, (float)outgoingVolume.cast<double>());
 	}
+
 	if (incomingVolume.is_of_type<double>())
 	{
 		pjsua_conf_adjust_tx_level(0, (float)incomingVolume.cast<double>());
@@ -231,3 +271,54 @@ FB::VariantMap BlabbleAPI::GetSignalLevel()
 
 	return map;
 }
+
+void BlabbleAPI::getLogAD()
+{
+	BlabbleLogging::getLogAD();
+}
+
+void BlabbleAPI::writeLogAD(std::string data) 
+{
+	BlabbleLogging::writeLogAD(data);
+}
+
+void BlabbleAPI::setLogDimension(int dimension)
+{
+	BlabbleLogging::setLogDimension(dimension);
+}
+
+void BlabbleAPI::setLogNumber(int number)
+{
+	BlabbleLogging::setLogNumber(number);
+}
+
+int BlabbleAPI::getLogDimension()
+{
+	return BlabbleLogging::getLogDimension();
+}
+
+int BlabbleAPI::getLogNumber()
+{
+	return BlabbleLogging::getLogNumber();
+}
+
+void BlabbleAPI::setLogPath(std::string logpath)
+{
+	BlabbleLogging::setLogPath(logpath);
+}
+
+void BlabbleAPI::ZipSender(std::string host) 
+{
+	BlabbleLogging::ZipSender(host);
+}
+
+void BlabbleAPI::SetCodecPriority(std::string codec, int value) 
+{
+	manager_->SetCodecPriority(codec.c_str(), value);
+}
+/*
+void BlabbleAPI::SetCodecPriorityAll(std::map<std::string,int> codecMap)
+{
+	PjsuaManager::SetCodecPriorityAll(codecMap);
+}
+*/

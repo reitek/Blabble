@@ -137,7 +137,11 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief Called by BlabbleAccount when PJSIP notifies us of a change in the call state.
 		 */
 		void OnCallState(pjsua_call_id call_id, pjsip_event *e);
-		
+
+		/*! @Brief Called by BlabbleAccount when PJSIP notifies us of a transaction state change.
+		*/
+		void OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e);
+
 		/*! @Brief Called by BlabbleAccount when PJSIP notifies us of the status of a transfer.
 		 */
 		bool OnCallTransferStatus(int status);
@@ -147,9 +151,15 @@ class BlabbleCall : public FB::JSAPIAuto
 		pj_status_t MakeCall(const std::string& dest, const std::string& identity = "");
 		
 		/*! @Brief Called by BlabbleAccount to buildup a BlabbleCall for an incoming call.
+
+			 REITEK: Added mustAnswerCall parameter for auto answer handling
 		 */
-		bool RegisterIncomingCall(pjsua_call_id callId);  
-		
+		bool RegisterIncomingCall(pjsua_call_id callId);
+
+		/*! @Brief REITEK: Called by BlabbleAccount to handle an incoming call.
+		 */
+		bool HandleIncomingCall(pjsip_rx_data *rdata);		
+
 		/*! @Brief A globally unique id for this call. 
 		 *
 		 *  Used to identify a call between accounts and even after it has been

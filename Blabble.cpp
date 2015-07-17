@@ -94,6 +94,7 @@ FB::JSAPIPtr Blabble::createJSAPI()
 {
 	boost::optional<std::string> logging, ice;
 	bool enableIce = false;
+
 	try 
 	{
 		if ((logging = this->getParam("logging")) && *logging == "true")
@@ -104,9 +105,17 @@ FB::JSAPIPtr Blabble::createJSAPI()
 		{
 			enableIce = true;
 		}
+
+		// REITEK: read insecure and secure SIP ports from configuration and construct the manager using each one of them (or the default value if not configured)
+		const int sipPort = std::stoi(this->getParam("sipport").get_value_or("5060"));
+		const int sipTlsPort = std::stoi(this->getParam("siptlsport").get_value_or("5061"));
+
 		PjsuaManagerPtr manager = PjsuaManager::GetManager(this->m_filesystemPath,
 			enableIce, 
-			this->getParam("stunserver").get_value_or(""));
+			this->getParam("stunserver").get_value_or(""),
+			sipPort,
+			sipTlsPort);
+
 		if (!manager)
 		{
 			return boost::make_shared<BlabbleAPIInvalid>("Unable to create manager");

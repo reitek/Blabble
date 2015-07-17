@@ -1,22 +1,22 @@
 #/**********************************************************\ 
 #
 # Auto-Generated Plugin Configuration file
-# for Blabble
+# for PluginSIP
 #
 #\**********************************************************/
 
-set(PLUGIN_NAME "Blabble")
-set(PLUGIN_PREFIX "BL")
-set(COMPANY_NAME "Zaltar")
+set(PLUGIN_NAME "PluginSIP")
+set(PLUGIN_PREFIX "PS")
+set(COMPANY_NAME "Reitek S.p.A.")
 
 # ActiveX constants:
 set(FBTYPELIB_NAME PjsipJsLib)
-set(FBTYPELIB_DESC "Blabble 1.0 Type Library")
-set(IFBControl_DESC "Blabble Control Interface")
-set(FBControl_DESC "Blabble Control Class")
-set(IFBComJavascriptObject_DESC "Blabble IComJavascriptObject Interface")
-set(FBComJavascriptObject_DESC "Blabble ComJavascriptObject Class")
-set(IFBComEventSource_DESC "Blabble IFBComEventSource Interface")
+set(FBTYPELIB_DESC "PluginSIP 1.0 Type Library")
+set(IFBControl_DESC "PluginSIP Control Interface")
+set(FBControl_DESC "PluginSIP Control Class")
+set(IFBComJavascriptObject_DESC "PluginSIP IComJavascriptObject Interface")
+set(FBComJavascriptObject_DESC "PluginSIP ComJavascriptObject Class")
+set(IFBComEventSource_DESC "PluginSIP IFBComEventSource Interface")
 set(AXVERSION_NUM "1")
 
 # NOTE: THESE GUIDS *MUST* BE UNIQUE TO YOUR PLUGIN/ACTIVEX CONTROL!  YES, ALL OF THEM!
@@ -33,22 +33,22 @@ else ( FB_PLATFORM_ARCH_32 )
 endif ( FB_PLATFORM_ARCH_32 )
 
 # these are the pieces that are relevant to using it from Javascript
-set(ACTIVEX_PROGID "Zaltar.Blabble")
-set(MOZILLA_PLUGINID "Blabble.com")
+set(ACTIVEX_PROGID "Reitek.PluginSIP")
+set(MOZILLA_PLUGINID "Reitek@PluginSIP.com")
 
 # for debugging
 add_firebreath_library(log4cplus)
 
 # strings
-set(FBSTRING_CompanyName "Zaltar")
-set(FBSTRING_PluginDescription "JS Bridge for PJSIP")
-set(FBSTRING_PLUGIN_VERSION "1.0.0.0")
-set(FBSTRING_LegalCopyright "Copyright 2010-2013 Andrew Ofisher")
+set(FBSTRING_CompanyName "Reitek S.p.A.")
+set(FBSTRING_PluginDescription "JS Bridge for PJSIP based on Blabble")
+set(FBSTRING_PLUGIN_VERSION "1.0.3.0")
+set(FBSTRING_LegalCopyright "Copyright 2014 Reitek S.p.A. & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
-set(FBSTRING_ProductName "Blabble")
+set(FBSTRING_ProductName "PluginSIP")
 set(FBSTRING_FileExtents "")
-set(FBSTRING_PluginName "Blabble")  # No 32bit postfix to maintain backward compatability.
-set(FBSTRING_MIMEType "application/x-blabble")
+set(FBSTRING_PluginName "PluginSIP")  # No 32bit postfix to maintain backward compatability.
+set(FBSTRING_MIMEType "application/x-pluginSIP")
 
 # Uncomment this next line if you're not planning on your plugin doing
 # any drawing:

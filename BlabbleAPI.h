@@ -10,6 +10,8 @@ Copyright 2012 Andrew Ofisher
 #ifndef H_BlabbleAPI
 #define H_BlabbleAPI
 
+#include "global/config.h"
+#include <windows.h>
 #include "JSAPIAuto.h"
 #include <string>
 #include <map>
@@ -24,7 +26,8 @@ Copyright 2012 Andrew Ofisher
 #include <pjsua-lib/pjsua.h>
 #include <pjsua-lib/pjsua_internal.h>
 #include <pjmedia.h>
-#include <pjmedia-codec.h> 
+#include <pjmedia-codec.h>
+#include "BlabbleLogging.h"
 
 FB_FORWARD_PTR(BlabbleCall)
 FB_FORWARD_PTR(BlabbleAccount)
@@ -90,7 +93,7 @@ public:
 	
 	/*! @Brief Allows JavaScript code to utilize BlabbleLogging
 	 */
-	void Log(int level, const std::wstring& msg);
+	void Log(int level, const std::string msg);
 	
 	/*! @Brief JavaScript property to determine if TLS support is available
 	 */
@@ -139,6 +142,34 @@ public:
 
 	//functions to retrieve objects from userdata
 	BlabbleAccountPtr FindAcc(int accId);
+
+
+	/*! @Brief Javascript function to get the current version of the plugin.
+	 *  This function returns a Javascript property containing the current version.
+	 *  The property is a string with format "x.x.x.x", that mean "Major.Minor.Build.InternalBuild"
+	 */
+	const std::string getVersion() { return FBSTRING_PLUGIN_VERSION; };
+
+	void getLogAD();
+
+	void writeLogAD(std::string data);
+
+	void setLogDimension(int dimension);
+
+	void setLogNumber(int number);
+
+	void setLogPath(std::string logPath);
+
+	void ZipSender(std::string host);
+
+	void SetCodecPriority(std::string codec, int value);
+
+	/*void SetCodecPriorityAll(std::map<std::string, int> codecMap);*/
+
+	int getLogDimension();
+
+	int getLogNumber();
+
 private:
 	FB::BrowserHostPtr browser_host_;
 	PjsuaManagerPtr manager_;

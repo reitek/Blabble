@@ -25,7 +25,7 @@ unsigned int BlabbleCall::GetNextId()
 }
 
 BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
-	: call_id_(-1), ringing_(false)
+	: call_id_(INVALID_CALL), ringing_(false)
 {
 	if (parent_account) 
 	{
@@ -39,7 +39,9 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 	}
 	
 	id_ = BlabbleCall::GetNextId();
-	BLABBLE_LOG_DEBUG("New call created. Global id: " << id_);
+	std::string str = "New call created. Global id: " + boost::lexical_cast<std::string>(id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_DEBUG("New call created. Global id: " << id_);
 
 	registerMethod("answer", make_method(this, &BlabbleCall::Answer));
 	registerMethod("hangup", make_method(this, &BlabbleCall::LocalEnd));
@@ -48,7 +50,7 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 	registerMethod("sendDTMF", make_method(this, &BlabbleCall::SendDTMF));
 	registerMethod("transferReplace", make_method(this, &BlabbleCall::TransferReplace));
 	registerMethod("transfer", make_method(this, &BlabbleCall::Transfer));
-
+	
 	registerProperty("callerId", make_property(this, &BlabbleCall::caller_id));
 	registerProperty("isActive", make_property(this, &BlabbleCall::is_active));
 	registerProperty("status", make_property(this, &BlabbleCall::status));
@@ -186,7 +188,9 @@ void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 
 BlabbleCall::~BlabbleCall(void)
 {
-	BLABBLE_LOG_DEBUG("Call Deleted. Global id: " << id_);
+	std::string str = "Call Deleted. Global id: " + boost::lexical_cast<std::string>(id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_DEBUG("Call Deleted. Global id: " << id_);
 	on_call_end_.reset();
 	LocalEnd();
 }
@@ -202,15 +206,88 @@ bool BlabbleCall::RegisterIncomingCall(pjsua_call_id call_id)
 	{
 		call_id_ = call_id;
 		pjsua_call_set_user_data(call_id, &id_);
+		std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" associated to BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id << " associated to BlabbleCall with Global id " << id_);
 
-		/* Automatically answer incoming calls with 180/RINGING */
-		pjsua_call_answer(call_id, 180, NULL, NULL);
-		
-		StartInRinging();
 		return true;
 	}
+	std::string str = "BlabbleCall::RegisterIncomingCall called on BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_)+" already associated to a PJSIP call, or invalid PJSIP call id specified";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_ERROR("BlabbleCall::RegisterIncomingCall called on BlabbleCall with Global id " << id_ << " already associated to a PJSIP call, or invalid PJSIP call id specified");
 
 	return false;
+}
+
+bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
+{
+	BlabbleAccountPtr p = parent_.lock();
+	if (!p)
+		return false;
+
+	if (call_id_ == INVALID_CALL)
+	{
+		std::string str = "BlabbleCall::HandleIncomingCall called on BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_)+" not associated to a PJSIP call";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_ERROR("BlabbleCall::HandleIncomingCall called on BlabbleCall with Global id " << id_ << " not associated to a PJSIP call");
+
+		return false;
+	}
+
+	bool mustAnswerCall	= false;
+
+	if (rdata != NULL)
+	{
+		const pj_str_t hdrName = { "Call-Info", 9 };
+		pjsip_generic_string_hdr* hdr = (pjsip_generic_string_hdr*)pjsip_msg_find_hdr_by_name(rdata->msg_info.msg, &hdrName, NULL);
+		if (hdr != NULL)
+		{
+			const char* hdrValue = "reitek;answer-after=";
+			hdr->hvalue.ptr[hdr->hvalue.slen] = '\0';
+
+			char* pos = strstr(hdr->hvalue.ptr, hdrValue);
+			if (pos != NULL)
+			{
+				pos = pos += strlen(hdrValue);
+				const int timeout = atoi(pos);
+				if (timeout == 0)
+				{
+					std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + ": auto answer header found";
+					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+					//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id_ << ": auto answer header found");
+
+					mustAnswerCall = true;
+				}
+			}
+		}
+	}
+
+	if (mustAnswerCall)
+	{
+		pjsua_call_answer(call_id_, 180, NULL, NULL);
+
+		//StartInRinging();
+
+		Answer();
+	}
+	else
+	{
+		pjsua_msg_data msg_data;
+
+		pjsip_generic_string_hdr allowEvents;
+		pj_str_t hname = pj_str("Allow-Events");
+		pj_str_t hvalue = pj_str("talk");
+
+		pjsua_msg_data_init(&msg_data);
+		pjsip_generic_string_hdr_init2(&allowEvents, &hname, &hvalue);
+		pj_list_push_back(&msg_data.hdr_list, &allowEvents);
+
+		pjsua_call_answer(call_id_, 180, NULL, &msg_data);
+
+		StartInRinging();
+	}
+
+	return true;
 }
 
 pj_status_t BlabbleCall::MakeCall(const std::string& dest, const std::string& identity)
@@ -263,6 +340,11 @@ bool BlabbleCall::Answer()
 		return false;
 
 	StopRinging();
+
+	std::string str = "Answering PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+" associated to BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_DEBUG("Answering PJSIP call id " << call_id_ << " associated to BlabbleCall with Global id " << id_);
+
 	pj_status_t status = pjsua_call_answer(call_id_, 200, NULL, NULL);
 
 	return status == PJ_SUCCESS;
@@ -445,10 +527,15 @@ void BlabbleCall::OnCallMediaState()
 	pjsua_call_info info;
 	pj_status_t status;
 	if ((status = pjsua_call_get_info(call_id_, &info)) != PJ_SUCCESS) {
-		BLABBLE_LOG_ERROR("Unable to get call info. PJSIP call id: " << call_id_ << ", global id: " << id_ << ", pjsua_call_get_info returned " << status);
+		std::string str = "Unable to get call info. PJSIP call id: " + boost::lexical_cast<std::string>(call_id_) + ", global id: " + boost::lexical_cast<std::string>(id_)+", pjsua_call_get_info returned " + boost::lexical_cast<std::string>(status);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_ERROR("Unable to get call info. PJSIP call id: " << call_id_ << ", global id: " << id_ << ", pjsua_call_get_info returned " << status);
 		StopRinging();
 		return;
 	}
+	std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+": media state: " + boost::lexical_cast<std::string>(info.media_status);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id_ << ": media state: " << info.media_status);
 
 	if (info.media_status == PJSUA_CALL_MEDIA_ACTIVE) 
 	{
@@ -465,6 +552,10 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	pjsua_call_info info;
 	if (pjsua_call_get_info(call_id, &info) == PJ_SUCCESS)
 	{
+		std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ": call state: " + boost::lexical_cast<std::string>(info.state);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id << ": call state: " << info.state);
+
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED) 
 		{
 			RemoteEnd(info);
@@ -486,6 +577,96 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 			BlabbleAccountPtr p = parent_.lock();
 			if (p)
 				p->OnCallRingChange(get_shared(), info);
+		}
+	}
+}
+
+// REITEK: Method to handle transaction state changes
+void BlabbleCall::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e)
+{
+	pjsua_call_info info;
+	if (pjsua_call_get_info(call_id, &info) == PJ_SUCCESS)
+	{
+		if (pjsip_method_cmp(&tsx->method, &pjsip_options_method) == 0)
+		{
+			/*
+			* Handle OPTIONS method.
+			*/
+			if (tsx->role == PJSIP_ROLE_UAS && tsx->state == PJSIP_TSX_STATE_TRYING)
+			{
+				/* Answer incoming OPTIONS with 200/OK */
+				pjsip_rx_data *rdata;
+				pjsip_tx_data *tdata;
+				pj_status_t status;
+
+				rdata = e->body.tsx_state.src.rdata;
+
+				status = pjsip_endpt_create_response(tsx->endpt, rdata, 200, NULL, &tdata);
+				if (status == PJ_SUCCESS)
+				{
+					status = pjsip_tsx_send_msg(tsx, tdata);
+				}
+
+				if (status == PJ_SUCCESS)
+				{
+					std::string str = "OPTIONS for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " answered";
+					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+					//BLABBLE_LOG_DEBUG("OPTIONS for PJSIP call id " << call_id << " answered");
+				}
+				else
+				{
+					std::string str = "OPTIONS for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " not answered";
+					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+					//BLABBLE_LOG_DEBUG("OPTIONS for PJSIP call id " << call_id << " not answered");
+				}
+			}
+		}
+		else if (pjsip_method_cmp(&tsx->method, &pjsip_notify_method) == 0)
+		{
+			/*
+			* Handle NOTIFY method.
+			*/
+			if (tsx->role == PJSIP_ROLE_UAS && tsx->state == PJSIP_TSX_STATE_TRYING)
+			{
+				/* Answer incoming NOTIFY with 200/OK if they contains the Event: talk */
+				pjsip_rx_data *rdata;
+				pjsip_tx_data *tdata;
+				pj_status_t status;
+
+				rdata = e->body.tsx_state.src.rdata;
+
+				const pj_str_t hdrName = { "Event", 5 };
+				pjsip_generic_string_hdr* hdr = (pjsip_generic_string_hdr*)pjsip_msg_find_hdr_by_name(rdata->msg_info.msg, &hdrName, NULL);
+				if (hdr != NULL)
+				{
+					const char* hdrValue = "talk";
+					hdr->hvalue.ptr[hdr->hvalue.slen] = '\0';
+
+					if (strcmp(hdr->hvalue.ptr, hdrValue) == 0)
+					{
+						status = pjsip_endpt_create_response(tsx->endpt, rdata, 200, NULL, &tdata);
+						if (status == PJ_SUCCESS)
+						{
+							status = pjsip_tsx_send_msg(tsx, tdata);
+						}
+
+						if (status == PJ_SUCCESS)
+						{
+							std::string str = "NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" answered";
+							BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+							//BLABBLE_LOG_DEBUG("NOTIFY (Event:Talk) for PJSIP call id " << call_id << " answered");
+						}
+						else
+						{
+							std::string str = "NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" not answered";
+							BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+							//BLABBLE_LOG_ERROR("NOTIFY (Event:Talk) for PJSIP call id " << call_id << " not answered");
+						}
+
+						Answer();
+					}
+				}
+			}
 		}
 	}
 }

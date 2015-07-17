@@ -41,9 +41,10 @@ typedef std::map<int, BlabbleAccountPtr> BlabbleAccountMap;
 class PjsuaManager : public boost::enable_shared_from_this<PjsuaManager>
 {
 public:
-	
+
+	// REITEK: Added insecure and secure SIP ports
 	static PjsuaManagerPtr GetManager(const std::string& path, bool enableIce,
-		const std::string& stunServer);
+		const std::string& stunServer, const int& sipPort, const int& sipTlsPort);
 	virtual ~PjsuaManager();
 
 	/*! @Brief Retrive the current audio manager.
@@ -58,33 +59,42 @@ public:
 	/*! Return true if we have TLS/SSL capability.
 	 */
 	bool has_tls() { return has_tls_; }
+
+	static void SetCodecPriority(const char* codec, int value);
+
+	//void SetCodecPriorityAll(std::vector<std::pair<std::string, int>> codecMap); ==> NON ESPOSTO
 	
 public:
 	/*! @Brief Callback for PJSIP.
 	 *  Called when an incoming call comes in on an account.
 	 */
 	static void OnIncomingCall(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data *rdata);
-	
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called when the media state of a call changes.
 	 */
 	static void OnCallMediaState(pjsua_call_id call_id);
-	
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called when the state of a call changes.
 	 */
 	static void OnCallState(pjsua_call_id call_id, pjsip_event *e);
-	
+
+	/*! @Brief Callback for PJSIP.
+	*  Called when the state of a transaction within a call changes.
+	*/
+	static void OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e);
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called when the registration status of an account changes.
 	 */
 	static void OnRegState(pjsua_acc_id acc_id);
-	
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called if there is a change in the transport. This is usually for TLS.
 	 */
 	static void OnTransportState(pjsip_transport *tp, pjsip_transport_state state, const pjsip_transport_state_info *info);
-	
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called after a call is transfer to report the status.
 	 */
@@ -97,9 +107,11 @@ private:
 	bool has_tls_;
 
 	static PjsuaManagerWeakPtr instance_;
+
 	//PjsuaManager is a singleton. Only one should ever exist so that PjSip callbacks work.
+	// REITEK: Added insecure and secure SIP ports
 	PjsuaManager(const std::string& executionPath, bool enableIce,
-		const std::string& stunServer);
+		const std::string& stunServer, const int& sipPort, const int& sipTlsPor);
 };
 
 #endif // H_PjsuaManagerPLUGIN
