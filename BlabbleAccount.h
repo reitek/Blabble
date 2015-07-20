@@ -168,7 +168,7 @@ private:
 	FB::JSObjectPtr on_incoming_call_;
 	FB::JSObjectPtr on_reg_state_;
 
-	BlabbleAccountPtr get_shared() { return boost::static_pointer_cast<BlabbleAccount>(this->shared_from_this()); }
+	BlabbleAccountPtr get_shared() { return std::static_pointer_cast<BlabbleAccount>(this->shared_from_this()); }
 	BlabbleCallPtr FindCall(pjsua_call_id call_id);
 
 	// REITEK: Proxy URL

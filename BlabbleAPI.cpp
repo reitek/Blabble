@@ -74,7 +74,7 @@ void BlabbleAPI::Log(int level, const std::string msg)
 
 BlabbleAccountWeakPtr BlabbleAPI::CreateAccount(const FB::VariantMap &params)
 {
-	BlabbleAccountPtr account = boost::make_shared<BlabbleAccount>(manager_);
+	BlabbleAccountPtr account = std::make_shared<BlabbleAccount>(manager_);
 	try 
 	{
 		FB::VariantMap::const_iterator iter = params.find("host");

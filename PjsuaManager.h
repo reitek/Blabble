@@ -13,7 +13,7 @@ Copyright 2012 Andrew Ofisher
 #include "JSAPIAuto.h"
 #include <string>
 #include <map>
-#include <boost/smart_ptr/shared_ptr.hpp>
+//#include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/optional.hpp>
 #include <pjlib.h>
 #include <pjlib-util.h>
@@ -38,7 +38,7 @@ typedef std::map<int, BlabbleAccountPtr> BlabbleAccountMap;
  *
  *  @author Andrew Ofisher (zaltar)
 */
-class PjsuaManager : public boost::enable_shared_from_this<PjsuaManager>
+class PjsuaManager : public std::enable_shared_from_this<PjsuaManager>
 {
 public:
 

@@ -1,6 +1,6 @@
 #/**********************************************************\ 
 # Auto-generated Windows project definition file for the
-# Blabble project
+# Reitek PluginSIP project
 #\**********************************************************/
 
 # Windows template platform definition CMake file
@@ -44,9 +44,14 @@ add_windows_plugin(${PROJECT_NAME} SOURCES)
 #    "${CMAKE_CURRENT_SOURCE_DIR}/sign/passphrase.txt"
 #    "http://timestamp.verisign.com/scripts/timestamp.dll")
 
-# add library dependencies here; leave ${PLUGIN_INTERNAL_DEPS} there unless you know what you're doing!
+link_boost_library(${PROJECT_NAME} date_time)
+link_boost_library(${PROJECT_NAME} filesystem)
+link_boost_library(${PROJECT_NAME} regex)
+
+# add library dependencies here; leave ${FB_PLUGIN_LIBRARIES} there unless you know what you're doing!
 target_link_libraries(${PROJECT_NAME}
-    ${PLUGIN_INTERNAL_DEPS}
+    ${FB_PLUGIN_LIBRARIES}
+#	log4cplus
 	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc12-Release.lib
 	debug $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc12-Debug.lib
 	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libcurls.lib
@@ -64,11 +69,14 @@ set(WIX_HEAT_FLAGS
     -dr INSTALLDIR      # Set the directory ID to put the files in
     )
 
+get_plugin_path(PLUGIN_FILEPATH ${PROJECT_NAME})
+get_filename_component(PLUGIN_PATH ${PLUGIN_FILEPATH} DIRECTORY)
+
 add_wix_installer( ${PLUGIN_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/Win/WiX/BlabbleInstaller.wxs
     PluginDLLGroup
-    ${FB_BIN_DIR}/${PLUGIN_NAME}/${CMAKE_CFG_INTDIR}/
-    ${FB_BIN_DIR}/${PLUGIN_NAME}/${CMAKE_CFG_INTDIR}/${FBSTRING_PluginFileName}.dll
+    ${PLUGIN_PATH}
+    $<TARGET_FILE:${PROJECT_NAME}>
     ${PROJECT_NAME}
     )
 

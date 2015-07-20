@@ -1,4 +1,1 @@
-/* Localized versions of Info.plist keys */
-
-CFBundleName = "${PLUGIN_NAME}.plugin";
-NSHumanReadableCopyright = "${FBSTRING_LegalCopyright}";
+/* Localized versions of Info.plist keys */CFBundleName = "${PLUGIN_NAME}.plugin";NSHumanReadableCopyright = "${FBSTRING_LegalCopyright}";

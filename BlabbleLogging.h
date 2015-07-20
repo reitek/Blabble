@@ -13,8 +13,12 @@ Copyright 2012 Andrew Ofisher
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <vector>
+
+#if 0
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
+#endif
 
 namespace BlabbleLogging {
 
@@ -38,9 +42,11 @@ namespace BlabbleLogging {
 	 */
 	std::wstring getLogFilename();
 
+#if 0
 	/*! @Brief Map between PJSIP log levels and log4cplus
 	 */
 	log4cplus::LogLevel mapPJSIPLogLevel(int pjsipLevel);
+#endif
 
 	/*! @Brief REITEK
 	 *	Set Log File dimension
@@ -105,9 +111,11 @@ namespace BlabbleLogging {
 	std::ofstream createFile(const std::string &filepath);
 
 	extern bool logging_started;
+
+#if 0
 	extern log4cplus::Logger blabble_logger;
 	extern log4cplus::Logger js_logger;
-
+#endif
 }
 
 #define BLABBLE_LOG_TRACE(what)								\

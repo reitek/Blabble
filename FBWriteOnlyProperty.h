@@ -29,7 +29,7 @@ namespace FB {
     make_write_only_property(C* instance, F1 f1)
     {
         return PropertyFunctors(
-			boost::bind(FB::detail::properties::dummyGetter),
+			std::bind(FB::detail::properties::dummyGetter),
             FB::detail::properties::setter<C, F1>::result::f(instance, f1));
     }
 }

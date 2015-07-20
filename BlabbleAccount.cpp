@@ -153,7 +153,7 @@ bool BlabbleAccount::OnIncomingCall(pjsua_call_id call_id, pjsip_rx_data *rdata)
 	if (s < cid.length() && e < cid.length())
 		cid = cid.substr(s, e-s);
 
-	BlabbleCallPtr call = boost::make_shared<BlabbleCall>(get_shared());
+	BlabbleCallPtr call = std::make_shared<BlabbleCall>(get_shared());
 
 	if (!call->RegisterIncomingCall(call_id))
 		return false;
@@ -167,7 +167,8 @@ bool BlabbleAccount::OnIncomingCall(pjsua_call_id call_id, pjsip_rx_data *rdata)
 	ringing_call_ = call->id();
 
 	if (on_incoming_call_)
-		on_incoming_call_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(call))(BlabbleAccountWeakPtr(get_shared())));
+		//on_incoming_call_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(call))(BlabbleAccountWeakPtr(get_shared())));
+		on_incoming_call_->InvokeAsync("", { BlabbleCallWeakPtr(call), BlabbleAccountWeakPtr(get_shared()) });
 
 	if (!call->HandleIncomingCall(rdata))
 	{
@@ -287,7 +288,8 @@ void BlabbleAccount::OnRegState()
 	pjsua_acc_get_info(id_, &info);
 
 	if (on_reg_state_)
-		on_reg_state_->InvokeAsync("", FB::variant_list_of(BlabbleAccountWeakPtr(get_shared()))((long)info.status));
+		//on_reg_state_->InvokeAsync("", FB::variant_list_of(BlabbleAccountWeakPtr(get_shared()))((long)info.status));
+		on_reg_state_->InvokeAsync("", { BlabbleAccountWeakPtr(get_shared()), (long)info.status });
 }
 
 FB::variant BlabbleAccount::MakeCall(const FB::VariantMap &params)
@@ -335,7 +337,7 @@ FB::variant BlabbleAccount::MakeCall(const FB::VariantMap &params)
 		identity = default_identity;
 	}
 
-	BlabbleCallPtr call = boost::make_shared<BlabbleCall>(get_shared());
+	BlabbleCallPtr call = std::make_shared<BlabbleCall>(get_shared());
 
 	if ((iter = params.find("onCallConnected")) != params.end() &&
 		iter->second.is_of_type<FB::JSObjectPtr>())

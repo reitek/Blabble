@@ -1,13 +1,22 @@
 #/**********************************************************\ 
 #
 # Auto-Generated Plugin Configuration file
-# for PluginSIP
-#
+# for Reitek PluginSIP
 #\**********************************************************/
 
 set(PLUGIN_NAME "PluginSIP")
 set(PLUGIN_PREFIX "PS")
 set(COMPANY_NAME "Reitek S.p.A.")
+set(COMPANY_REVDOMAIN "com.reitek")
+# NOTE: If you are going to deploy your own extension you *must* change the
+#       key and ID to your own key and matching ID.  You can use cmake/makeid.py
+#       (https://gist.github.com/taxilian/d42b8768b2e3ef5c6998) to generate them
+set(PLUGIN_CRX_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
+set(PLUGIN_CRX_KEY "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDVd2HTm3jc05eJiizFvPK7Ta7dG4iguLggWzfdW4/hQCnzs/YWF0J8Cjclzw4gvegEBPKYkq/e1BaujqKMd0QA/Xk/5d8hFMeaVtQYuEe76wB2vdJn7mT+vhpkuIwBvy0aLRpRISlH3Xzu6k8nBBK0TWzuBwbeuRJ4S98Gn+2FVwIDAQAB")
+set(PLUGIN_CRX_ID "igpaogmmhnicmonampjhibhcdpgjoffo")
+set(PLUGIN_CRX_WYRMHOLE_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
+set(PLUGIN_CRX_NATIVEHOST_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
+set(PLUGIN_CRX_NATIVEHOST_DESCRIPTION "${COMPANY_REVDOMAIN}.${PLUGIN_NAME} Native Messaging Host")
 
 # ActiveX constants:
 set(FBTYPELIB_NAME PjsipJsLib)
@@ -36,19 +45,19 @@ endif ( FB_PLATFORM_ARCH_32 )
 set(ACTIVEX_PROGID "Reitek.PluginSIP")
 set(MOZILLA_PLUGINID "Reitek@PluginSIP.com")
 
-# for debugging
-add_firebreath_library(log4cplus)
-
 # strings
 set(FBSTRING_CompanyName "Reitek S.p.A.")
-set(FBSTRING_PluginDescription "JS Bridge for PJSIP based on Blabble")
-set(FBSTRING_PLUGIN_VERSION "1.0.3.0")
+set(FBSTRING_PLUGIN_VERSION "1.0.4.0")
 set(FBSTRING_LegalCopyright "Copyright 2014 Reitek S.p.A. & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
 set(FBSTRING_ProductName "PluginSIP")
-set(FBSTRING_FileExtents "")
 set(FBSTRING_PluginName "PluginSIP")  # No 32bit postfix to maintain backward compatability.
+set(FBSTRING_FileExtents "")
+set(FBSTRING_PluginDescription "JS Bridge for PJSIP based on Blabble")
 set(FBSTRING_MIMEType "application/x-pluginSIP")
+
+# If you want to register per-machine on Windows, uncomment this line
+#set (FB_ATLREG_MACHINEWIDE 1)
 
 # Uncomment this next line if you're not planning on your plugin doing
 # any drawing:
@@ -59,9 +68,7 @@ set (FB_GUI_DISABLED 1)
 set(FBMAC_USE_QUICKDRAW 0)
 set(FBMAC_USE_CARBON 0)
 set(FBMAC_USE_COCOA 0)
+set (FBMAC_USE_QUICKDRAW                 0)
 set(FBMAC_USE_COREGRAPHICS 0)
 set(FBMAC_USE_COREANIMATION 0)
 set(FBMAC_USE_INVALIDATINGCOREANIMATION 0)
-
-# If you want to register per-machine on Windows, uncomment this line
-#set (FB_ATLREG_MACHINEWIDE 1)

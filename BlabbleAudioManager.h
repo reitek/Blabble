@@ -12,7 +12,7 @@ Copyright 2012 Andrew Ofisher
 
 #include <string>
 #include <map>
-#include <boost/smart_ptr/shared_ptr.hpp>
+//#include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <pjlib.h>
 #include <pjlib-util.h>

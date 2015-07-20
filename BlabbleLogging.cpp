@@ -1,12 +1,16 @@
 #define CURL_STATICLIB
 
 #include "BlabbleLogging.h"
+
+#if 0
 //#include "log4cplus/config/defines.hxx"
 #include "log4cplus/loglevel.h"
 #include "log4cplus/layout.h"
 #include "log4cplus/ndc.h"
 #include "log4cplus/fileappender.h"
 #include "log4cplus/hierarchy.h"
+#endif
+
 #include "utf8_tools.h"
 #include "boost/thread.hpp"
 #include "boost/filesystem.hpp"
@@ -35,9 +39,11 @@ namespace BlabbleLogging {
 	 */
 	bool logging_started = false;
 
+#if 0
 	/*! Keep the logger around for reference
 	 */
 	log4cplus::Logger blabble_logger, js_logger;
+#endif
 
 	std::string extensionLOG = ".log";
 	std::string extensionZIP = ".zip";
@@ -124,6 +130,7 @@ void BlabbleLogging::blabbleLog(int level, const char* data, int len)
 	}
 }
 
+#if 0
 log4cplus::LogLevel BlabbleLogging::mapPJSIPLogLevel(int pjsipLevel) {
 	switch (pjsipLevel) {
 		case 0:
@@ -141,6 +148,7 @@ log4cplus::LogLevel BlabbleLogging::mapPJSIPLogLevel(int pjsipLevel) {
 			return log4cplus::TRACE_LOG_LEVEL;
 	}
 }
+#endif
 
 void BlabbleLogging::setLogDimension(int dimension) 
 {

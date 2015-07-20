@@ -1,14 +1,28 @@
 #/**********************************************************\ 
-# 
-# Auto-generated CMakeLists.txt for the BlabblePhone project
-#
+# CMakeLists.txt for the Reitek PluginSIP project
 #\**********************************************************/
 
 # Written to work with cmake 2.6
 cmake_minimum_required (VERSION 2.6)
 set (CMAKE_BACKWARDS_COMPATIBILITY 2.6)
 
+include(PluginConfig.cmake)
 Project(${PLUGIN_NAME})
+
+set (FB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/firebreath CACHE PATH "Path to FireBreath Root")
+if (NOT EXISTS ${FB_ROOT}/CMakeLists.txt)
+    message(FATAL_ERROR "You need to configure FB_ROOT to the root directory of your FireBreath installation!")
+endif()
+
+include(${FB_ROOT}/PluginIncludes.cmake)
+add_subdirectory(${FB_PLUGINAUTO_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/PluginAuto)
+
+add_subdirectory(${FB_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/firebreath)
+
+#Visual Studio Express editions don't want Solution Folders enabled.
+if(NOT ATL_LIBRARY)
+    set_property(GLOBAL PROPERTY USE_FOLDERS On)
+endif()
 
 file (GLOB GENERAL RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     [^.]*.h
@@ -18,63 +32,65 @@ file (GLOB GENERAL RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
 if (WIN32)
-INCLUDE_DIRECTORIES(
-	${PLUGIN_INCLUDE_DIRS}
+include_directories(
+	${FB_PLUGIN_INCLUDE_DIRS}
+	${Boost_INCLUDE_DIRS}
+#	${FB_ROOT}\\src\\libs\\log4cplus\\include
 	\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
 	\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
 	\\..\\..\\..\\..\\env\\Win32\\include\\curl
 )
 
-SET(PLUGIN_INTERNAL_DEPS 
-	${PLUGIN_INTERNAL_DEPS}
+set(FB_PLUGIN_INTERNAL_DEPS 
+	${FB_PLUGIN_INTERNAL_DEPS}
 	Iphlpapi.lib
 	netapi32.lib
 	mswsock.lib
 	ws2_32.lib
 )
 
-ADD_DEFINITIONS(-DPJ_WIN32=1)
+add_definitions(-DPJ_WIN32=1)
 
 endif()
 
 if (UNIX)
 
-INCLUDE_DIRECTORIES(
-	${PLUGIN_INCLUDE_DIRS}
+include_directories(
+	${FB_PLUGIN_INCLUDE_DIRS}
 )
 
 find_package(PkgConfig)
 
 pkg_check_modules(PJSIP REQUIRED libpjproject)
 
-SET(PLUGIN_INTERNAL_DEPS 
-	${PLUGIN_INTERNAL_DEPS}
+set(FB_PLUGIN_INTERNAL_DEPS 
+	${FB_PLUGIN_INTERNAL_DEPS}
 	${PJSIP_LIBRARIES}
 )
 
 #Add GCC debug flags when in debug build
-SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O0 -g3" )
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O0 -g3" )
 
 endif()
 
 if (APPLE)
 
-FIND_LIBRARY(AUDIOTOOLBOX_LIBRARY AudioToolbox)
-FIND_LIBRARY(AUDIOUNIT_LIBRARY AudioUnit)
-FIND_LIBRARY(COREAUDIO_LIBRARY CoreAudio)
+find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
+find_library(AUDIOUNIT_LIBRARY AudioUnit)
+find_library(COREAUDIO_LIBRARY CoreAudio)
 
-MARK_AS_ADVANCED(AUDIOTOOLBOX_LIBRARY
+mark_as_advanced(AUDIOTOOLBOX_LIBRARY
 				AUDIOUNIT_LIBRARY
 				COREAUDIO_LIBRARY)
-SET(EXTRA_LIBS ${AUDIOTOOLBOX_LIBRARY} ${AUDIOUNIT_LIBRARY} ${COREAUDIO_LIBRARY})
+set(EXTRA_LIBS ${AUDIOTOOLBOX_LIBRARY} ${AUDIOUNIT_LIBRARY} ${COREAUDIO_LIBRARY})
 
-INCLUDE_DIRECTORIES(
-	${PLUGIN_INCLUDE_DIRS}
+include_directories(
+	${FB_PLUGIN_INCLUDE_DIRS}
 	/usr/local/include
 )
 
-SET(PLUGIN_INTERNAL_DEPS 
-	${PLUGIN_INTERNAL_DEPS}
+set(FB_PLUGIN_INTERNAL_DEPS 
+	${FB_PLUGIN_INTERNAL_DEPS}
 	${EXTRA_LIBS}
 )
 
@@ -82,19 +98,21 @@ endif()
 	
 # Generated files are stored in ${GENERATED} by the project configuration
 SET_SOURCE_FILES_PROPERTIES(
-    ${GENERATED}
+    ${FB_PLUGIN_GENERATED_SOURCES}
     PROPERTIES
         GENERATED 1
     )
 
 SOURCE_GROUP(Generated FILES
-    ${GENERATED}
+    ${FB_PLUGIN_GENERATED_SOURCES}
     )
 
 SET( SOURCES
     ${GENERAL}
-    ${GENERATED}
+    ${FB_PLUGIN_GENERATED_SOURCES}
     )
+
+#add_firebreath_library(log4cplus)
 
 # REITEK: Added useful macros (Begin)
 
@@ -130,7 +148,16 @@ endmacro(my_add_link_flags)
 
 # REITEK: Added useful macros (End)
 
-# This will include Win/projectDef.cmake, X11/projectDef.cmake, Mac/projectDef 
-# depending on the platform
-include_platform()
+if (WIN32)
+    set (PLATFORM_NAME "Win")
+    include(Win/projectDef.cmake)
+elseif(APPLE)
+    set (PLATFORM_NAME "Mac")
+    include(Mac/projectDef.cmake)
+elseif(UNIX)
+    set (PLATFORM_NAME "X11")
+    include(X11/projectDef.cmake)
+endif()
 
+configure_chrome_wyrmhole()
+add_native_message_host(${PROJECT_NAME})

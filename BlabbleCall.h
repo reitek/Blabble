@@ -189,14 +189,14 @@ class BlabbleCall : public FB::JSAPIAuto
 		BlabbleAccountPtr CheckAndGetParent();
 		//Ended by system
 		void RemoteEnd(const pjsua_call_info &info);
-		BlabbleCallPtr get_shared() { return boost::static_pointer_cast<BlabbleCall>(this->shared_from_this()); }
+		BlabbleCallPtr get_shared() { return std::static_pointer_cast<BlabbleCall>(this->shared_from_this()); }
 		
 	private:
 		static unsigned int id_counter_;
 		static unsigned int GetNextId();
 
 		void CallOnCallEnd();
-		void CallOnCallEnd(pjsip_status_code status);
+		void CallOnCallEndStatus(pjsip_status_code status);
 		void CallOnTransferStatus(int status);
 };
 

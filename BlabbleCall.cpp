@@ -112,7 +112,7 @@ void BlabbleCall::LocalEnd()
 	if (on_call_end_)
 	{
 		BlabbleCallPtr call = get_shared();
-		on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEnd, call));
+		on_call_end_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEnd, call));
 	}
 
 	BlabbleAccountPtr p = parent_.lock();
@@ -122,17 +122,20 @@ void BlabbleCall::LocalEnd()
 
 void BlabbleCall::CallOnCallEnd()
 {
-	on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+	//on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+	on_call_end_->Invoke("", { BlabbleCallWeakPtr(get_shared()) } );
 }
 
-void BlabbleCall::CallOnCallEnd(pjsip_status_code status)
+void BlabbleCall::CallOnCallEndStatus(pjsip_status_code status)
 {
-	on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
+	//on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
+	on_call_end_->Invoke("", { BlabbleCallWeakPtr(get_shared()), status } );
 }
 
 void BlabbleCall::CallOnTransferStatus(int status)
 {
-	on_transfer_status_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
+	//on_transfer_status_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
+	on_transfer_status_->Invoke("", { BlabbleCallWeakPtr(get_shared()), status } );
 }
 
 //Ended by remote, could be becuase of an error
@@ -171,13 +174,13 @@ void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 		if (on_call_end_)
 		{
 			BlabbleCallPtr call = get_shared();
-			on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEnd, call, info.last_status));
+			on_call_end_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEndStatus, call, info.last_status));
 		}
 	} else {
 		if (on_call_end_)
 		{
 			BlabbleCallPtr call = get_shared();
-			on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEnd, call));
+			on_call_end_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEnd, call));
 		}
 	}
 
@@ -563,7 +566,8 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 		else if (info.state == PJSIP_INV_STATE_CALLING)
 		{
 			if (on_call_ringing_)
-				on_call_ringing_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+				//on_call_ringing_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+				on_call_ringing_->InvokeAsync("", { BlabbleCallWeakPtr(get_shared()) } );
 
 			BlabbleAccountPtr p = parent_.lock();
 			if (p)
@@ -572,7 +576,8 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 		else if (info.state == PJSIP_INV_STATE_CONFIRMED)
 		{
 			if (on_call_connected_)
-				on_call_connected_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+				//on_call_connected_->InvokeAsync("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
+				on_call_connected_->InvokeAsync("", { BlabbleCallWeakPtr(get_shared()) } );
 
 			BlabbleAccountPtr p = parent_.lock();
 			if (p)
@@ -678,7 +683,7 @@ bool BlabbleCall::OnCallTransferStatus(int status)
 		if (on_transfer_status_)
 		{
 			BlabbleCallPtr call = get_shared();
-			on_transfer_status_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnTransferStatus, call, status));
+			on_transfer_status_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnTransferStatus, call, status));
 		}
 	}
 

@@ -85,7 +85,7 @@ void Blabble::shutdown()
 ///
 /// Note that m_host is your BrowserHost and shared_ptr returns a
 /// FB::PluginCorePtr, which can be used to provide a
-/// boost::weak_ptr<Blabble> for your JSAPI class.
+/// std::weak_ptr<Blabble> for your JSAPI class.
 ///
 /// Be very careful where you hold a shared_ptr to your plugin class from,
 /// as it could prevent your plugin class from getting destroyed properly.
@@ -118,13 +118,13 @@ FB::JSAPIPtr Blabble::createJSAPI()
 
 		if (!manager)
 		{
-			return boost::make_shared<BlabbleAPIInvalid>("Unable to create manager");
+			return std::make_shared<BlabbleAPIInvalid>("Unable to create manager");
 		}
-		return boost::make_shared<BlabbleAPI>(m_host, manager);
+		return std::make_shared<BlabbleAPI>(m_host, manager);
 	}
 	catch (std::exception& e)
 	{
-		return boost::make_shared<BlabbleAPIInvalid>(e.what());
+		return std::make_shared<BlabbleAPIInvalid>(e.what());
 	}
 }
 

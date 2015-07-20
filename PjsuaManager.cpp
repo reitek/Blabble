@@ -18,7 +18,11 @@ Copyright 2012 Andrew Ofisher
 
 #include <pjsua-lib/pjsua_internal.h>
 #include <string>
+#include <io.h>
+#include <stdio.h>
 
+// REITEK: Internal log function for inhibiting built in pjsip logging
+static void log_func(int level, const char *data, int len) {}
 
 #if defined(PJMEDIA_HAS_RTCP_XR) && (PJMEDIA_HAS_RTCP_XR != 0)
 #   define STATS_BUF_SIZE	(1024 * 10)
@@ -36,7 +40,7 @@ PjsuaManagerPtr PjsuaManager::GetManager(const std::string& path, bool enableIce
 	if(!tmp) 
 	{ 
 		tmp = PjsuaManagerPtr(new PjsuaManager(path, enableIce, stunServer, sipPort, sipTlsPort));
-		instance_ = boost::weak_ptr<PjsuaManager>(tmp);
+		instance_ = std::weak_ptr<PjsuaManager>(tmp);
 	}
 	
 	return tmp;
@@ -101,6 +105,8 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 
 	// REITEK: User-Agent header handling
 	cfg.user_agent = pj_str("Reitek PluginSIP");
+
+	pj_log_set_log_func(&log_func);
 
 	status = pjsua_create();
 	if (status != PJ_SUCCESS)
@@ -178,7 +184,7 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 		path = appdata + "/Reitek/Contact/BrowserPlugin";
 #endif
 		
-		audio_manager_ = boost::make_shared<BlabbleAudioManager>(path);
+		audio_manager_ = std::make_shared<BlabbleAudioManager>(path);
 
 		BLABBLE_LOG_DEBUG("PjsuaManager startup complete.");
 	}
