@@ -15,7 +15,7 @@ Copyright 2012 Andrew Ofisher
 #include "JSAPIAuto.h"
 #include <string>
 #include <map>
-#include <boost/smart_ptr/shared_ptr.hpp>
+//#include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/optional.hpp>
 #include <pjlib.h>
 #include <pjlib-util.h>
@@ -68,29 +68,17 @@ public:
 	 *  See the JavaScript documentation for more information.
 	 */
 	BlabbleAccountWeakPtr CreateAccount(const FB::VariantMap &params);
-	
+
 	/*! @Brief Unsupported. Plays a wave file.
 	 */
-	bool PlayWav(const std::string& fileName);
-	
+	bool PlayWav(FB::VariantMap playWavParams);
+
 	/*! @Brief Unsupported. 
 	 *  Stops playing a wave file preivously played by 
 	 *  `PlayWav(fileName)`
 	 */
 	void StopWav();
-	
-	/*! @Brief Play a busy signal on the speakers.
-	 *  When a SIP call returns an error code of busy it is left
-	 *  to the user whether or not they want to play a busy signal
-	 *  tone like a good old fashioned phone would.
-	 */
-	void PlayBusySignal();
-	
-	/*! @Brief Stops playing a busy signal.
-	 *  @sa PlayBusySignal
-	 */
-	void StopBusySignal();
-	
+
 	/*! @Brief Allows JavaScript code to utilize BlabbleLogging
 	 */
 	void Log(int level, const std::string msg);
@@ -169,6 +157,15 @@ public:
 	int getLogDimension();
 
 	int getLogNumber();
+
+	bool setRingAudioDevice(FB::variant deviceId);
+	int getRingAudioDevice();
+
+	bool setRingVolume(FB::variant volume);
+	FB::variant getRingVolume();
+
+	bool setRingSound(FB::variant filePath);
+	const std::string getRingSound();
 
 private:
 	FB::BrowserHostPtr browser_host_;

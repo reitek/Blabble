@@ -13,8 +13,8 @@ Copyright 2012 Andrew Ofisher
 #include "JSAPIAuto.h"
 #include <string>
 #include <map>
-#include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/optional.hpp>
+//#include <boost/smart_ptr/shared_ptr.hpp>
+//#include <boost/optional.hpp>
 #include <pjlib.h>
 #include <pjlib-util.h>
 #include <pjnath.h>
@@ -24,6 +24,8 @@ Copyright 2012 Andrew Ofisher
 #include <pjsua-lib/pjsua.h>
 #include <pjmedia.h>
 #include <pjmedia-codec.h> 
+
+class Blabble;
 
 FB_FORWARD_PTR(BlabbleCall)
 FB_FORWARD_PTR(BlabbleAccount)
@@ -41,10 +43,9 @@ typedef std::map<int, BlabbleAccountPtr> BlabbleAccountMap;
 class PjsuaManager : public boost::enable_shared_from_this<PjsuaManager>
 {
 public:
+	// REITEK: Get/parse parameters passed to the plugin upon manager creation
 
-	// REITEK: Added insecure and secure SIP ports
-	static PjsuaManagerPtr GetManager(const std::string& path, bool enableIce,
-		const std::string& stunServer, const int& sipPort, const int& sipTlsPort);
+	static PjsuaManagerPtr GetManager(Blabble& pluginCore);
 	virtual ~PjsuaManager();
 
 	/*! @Brief Retrive the current audio manager.
@@ -109,9 +110,10 @@ private:
 	static PjsuaManagerWeakPtr instance_;
 
 	//PjsuaManager is a singleton. Only one should ever exist so that PjSip callbacks work.
-	// REITEK: Added insecure and secure SIP ports
-	PjsuaManager(const std::string& executionPath, bool enableIce,
-		const std::string& stunServer, const int& sipPort, const int& sipTlsPor);
+
+	// REITEK: Get/parse parameters passed to the plugin upon manager creation
+
+	PjsuaManager(Blabble& pluginCore);
 };
 
 #endif // H_PjsuaManagerPLUGIN

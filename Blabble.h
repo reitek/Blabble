@@ -39,7 +39,10 @@ public:
     virtual ~Blabble();
 
 public:
-    void onPluginReady();
+	// Give read-only access to the parameters passed to the plugin
+	const FB::VariantMap& getParams() const { return m_params; }
+
+	void onPluginReady();
     void shutdown();
     virtual FB::JSAPIPtr createJSAPI();
     // If you want your plugin to always be windowless, set this to true

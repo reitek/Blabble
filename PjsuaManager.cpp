@@ -20,32 +20,108 @@ Copyright 2012 Andrew Ofisher
 #include <string>
 
 
-#if defined(PJMEDIA_HAS_RTCP_XR) && (PJMEDIA_HAS_RTCP_XR != 0)
-#   define STATS_BUF_SIZE	(1024 * 10)
-#else
-#   define STATS_BUF_SIZE	(1024 * 3)
-#endif
 
 PjsuaManagerWeakPtr PjsuaManager::instance_;
 
-// REITEK: Added insecure and secure SIP ports
-PjsuaManagerPtr PjsuaManager::GetManager(const std::string& path, bool enableIce,
-	const std::string& stunServer, const int& sipPort, const int& sipTlsPort)
+PjsuaManagerPtr PjsuaManager::GetManager(Blabble& pluginCore)
 {
 	PjsuaManagerPtr tmp = instance_.lock();
 	if(!tmp) 
-	{ 
-		tmp = PjsuaManagerPtr(new PjsuaManager(path, enableIce, stunServer, sipPort, sipTlsPort));
+	{
+		tmp = PjsuaManagerPtr(new PjsuaManager(pluginCore));
 		instance_ = boost::weak_ptr<PjsuaManager>(tmp);
 	}
 	
 	return tmp;
 }
 
-// REITEK: Added insecure and secure SIP ports
-PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
-	const std::string& stunServer, const int& sipPort, const int& sipTlsPort)
+PjsuaManager::PjsuaManager(Blabble& pluginCore)
 {
+	// REITEK: Get/parse parameters passed to the plugin upon manager creation
+
+	boost::optional<std::string> logging, ice, ecalgo, loglevelparam;
+	bool enableIce = false;
+
+	if ((logging = pluginCore.getParam("logging")) && *logging == "true")
+	{
+		BlabbleLogging::initLogging();
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 " + std::string(FBSTRING_PluginName) + std::string(" version ") + std::string(FBSTRING_PLUGIN_VERSION);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	// REITEK: Output the parameters passed to the plugin
+
+	const FB::VariantMap& params = pluginCore.getParams();
+	if (!params.empty())
+	{
+		for (FB::VariantMap::const_iterator it = params.begin(); it != params.end(); ++it)
+		{
+			const FB::variant& val = it->second;
+
+			// Don't attempt to convert this kind of variant to a string, it will trow an exception
+			if (!val.is_of_type<FB::JSObjectPtr>())
+			{
+				const std::string& strval = val.convert_cast<std::string>();
+
+				{
+					// !!! UGLY (should automatically conform to pjsip formatting)
+					const std::string str = " INFO:                 " + it->first + std::string(": ") + strval;
+					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+				}
+			}
+		}
+	}
+	else
+	{
+		{
+			// !!! UGLY (should automatically conform to pjsip formatting)
+			const std::string str = " INFO:                 " + std::string("No parameters passed to the plugin");
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+		}
+	}
+
+	if ((ice = pluginCore.getParam("enableice")) && *ice == "true")
+	{
+		enableIce = true;
+	}
+
+	const std::string& stunServer = pluginCore.getParam("stunserver").get_value_or("");
+
+	// REITEK: read insecure and secure SIP ports from configuration and construct the manager using each one of them (or the default value if not configured)
+	const int sipPort = std::stoi(pluginCore.getParam("sipport").get_value_or("5060"));
+	const int sipTlsPort = std::stoi(pluginCore.getParam("siptlsport").get_value_or("5061"));
+
+	// REITEK: read EC tail len and EC algo (0 = default, 1=speex, 2=suppressor) from configuration
+
+	// !!! NOTE: Default value is 0, 64 should be used instead for connectivity over Internet
+	const int ecTailLen = std::stoi(pluginCore.getParam("ectaillen").get_value_or("0"));
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 ectaillen set to " + boost::lexical_cast<std::string>(ecTailLen);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	// !!! NOTE: Default value is 0, 2 should be used instead for connectivity over Internet
+	int ecAlgo = 0;
+
+	if (ecalgo = pluginCore.getParam("ecalgo"))
+	{
+		if ((*ecalgo == "0") || (*ecalgo == "default")) { ecAlgo = 0; }
+		else if ((*ecalgo == "1") || (*ecalgo == "speex")) { ecAlgo = 1; }
+		else if ((*ecalgo == "2") || (*ecalgo == "suppressor")) { ecAlgo = 2; }
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 ecalgo set to " + boost::lexical_cast<std::string>(ecAlgo);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
 	pj_status_t status;
 	pjsua_config cfg;
 	pjsua_logging_config log_cfg;
@@ -58,6 +134,7 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 	pjsua_config_default(&cfg);
 	pjsua_logging_config_default(&log_cfg);
 
+	// REITEK: Tweak maximum number of calls in order to also reduce memory usage (at most 1 active plus 1 for consultation are needed)
 	//cfg.max_calls = 511;
 	cfg.max_calls = 2;
 
@@ -69,11 +146,39 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 	cfg.cb.on_call_transfer_status = &PjsuaManager::OnCallTransferStatus;
 	cfg.cb.on_call_tsx_state = &PjsuaManager::OnCallTsxState;
 
-	log_cfg.level = 4;
-	log_cfg.console_level = 4;
+	// REITEK: Default log level is 4
+
+	//int loglevel = 4;
+	int loglevel = 5;	// FOR DEBUGGING REASONS; !!! NOTE: log level 6 is UNUSABLE !!!
+
+	// REITEK: Read desired log level
+	if (loglevelparam = pluginCore.getParam("loglevel"))
+	{
+		// Simple "trick" to raise the log level to higher values by not allowing the direct int value
+
+		if (*loglevelparam == "debug")
+			loglevel = 5;
+		else
+		{
+			const int loglevelparamint = std::stoi(*loglevelparam);
+
+			if (loglevelparamint < 5)
+				loglevel = loglevelparamint;
+		}
+	}
+
+	log_cfg.level = loglevel;
+	log_cfg.console_level = loglevel;
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 log level set to " + boost::lexical_cast<std::string>(loglevel);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
 	// REITEK: Log messages!
 	log_cfg.msg_logging = PJ_TRUE;
-	log_cfg.decor = PJ_LOG_HAS_SENDER | PJ_LOG_HAS_SPACE | PJ_LOG_HAS_LEVEL_TEXT;
+	log_cfg.decor = PJ_LOG_HAS_SENDER | PJ_LOG_HAS_SPACE | PJ_LOG_HAS_LEVEL_TEXT | PJ_LOG_HAS_THREAD_ID | PJ_LOG_HAS_THREAD_SWC;
 	log_cfg.cb = BlabbleLogging::blabbleLog;
 
 	// REITEK: !!! CHECK: Make TLS port configurable ?
@@ -90,8 +195,10 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 	media_cfg.no_vad = 1;
 	media_cfg.enable_ice = enableIce ? PJ_TRUE : PJ_FALSE;
 
-	// REITEK: Disable EC
-	media_cfg.ec_tail_len = 0;
+	// REITEK: Set EC tail len and EC algo
+	media_cfg.ec_tail_len = ecTailLen;
+	media_cfg.ec_options = ecAlgo;	// !!! NOTE: Additional options are not known (yet)
+	//media_cfg.snd_auto_close_time = -1;
 
 	if (!stunServer.empty()) 
 	{
@@ -100,7 +207,10 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 	}
 
 	// REITEK: User-Agent header handling
-	cfg.user_agent = pj_str("Reitek PluginSIP");
+	//cfg.user_agent = pj_str("Reitek PluginSIP");
+
+	const std::string& userAgent = std::string("Reitek ") + FBSTRING_ProductName + "/" + FBSTRING_PLUGIN_VERSION;
+	cfg.user_agent = pj_str(const_cast<char*>(userAgent.c_str()));
 
 	status = pjsua_create();
 	if (status != PJ_SUCCESS)
@@ -108,24 +218,27 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 
 	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
 	if (status != PJ_SUCCESS) 
-		throw std::runtime_error("Error in pjsua_init()");
+		throw std::runtime_error("pjsua_init failed");
 
 	try
 	{
+		// !!! CHECK: What about TCP without TLS?
+
 		status = pjsua_transport_create(PJSIP_TRANSPORT_TLS, &tls_tran_cfg, &this->tls_transport);
 		has_tls_ = status == PJ_SUCCESS;
 		if (!has_tls_) {
-			BLABBLE_LOG_DEBUG("Error in tls pjsua_transport_create. Tls will not be enabled");
+			// !!! UGLY (should automatically conform to pjsip formatting)
+			BLABBLE_LOG_DEBUG(" WARN:                 pjsua_transport_create failed for TLS transport: TLS not enabled");
 			this->tls_transport = -1;
 		}
 
 		status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &tran_cfg, &this->udp_transport);
 		if (status != PJ_SUCCESS)
-			throw std::runtime_error("Error in pjsua_transport_create for UDP transport");
+			throw std::runtime_error("pjsua_transport_create failed for UDP transport");
 
 		status = pjsua_start();
 		if (status != PJ_SUCCESS)
-			throw std::runtime_error("Error in pjsua_start()");
+			throw std::runtime_error("pjsua_start failed");
 
 		// REITEK: Codecs priority handling
 		pj_str_t tmpstr;
@@ -153,38 +266,14 @@ PjsuaManager::PjsuaManager(const std::string& executionPath, bool enableIce,
 		pjsua_codec_set_param(pj_cstr(&tmp, "g729"), &g729_param);
 #endif
 
-		// REITEK: Use our own directory for ringtones etc
-#if 0
-		std::string path = executionPath;
-		unsigned int tmp = path.find("plugins");
-		if (tmp != std::string::npos)
-		{
-			path = path.substr(0, tmp + 7);
-		}
-		tmp = path.find(FBSTRING_PluginFileName".");
-		if (tmp != std::string::npos)
-		{
-			path = path.substr(0, tmp - 1);
-		}
-#endif
-		
-		std::string path;
+		audio_manager_ = boost::make_shared<BlabbleAudioManager>(pluginCore);
 
-#if defined(XP_WIN)
-		std::string appdata = getenv("ALLUSERSPROFILE");
-		path = appdata + "\\Mozilla\\Plugins";
-#elif defined(XP_LINUX)
-		std::string appdata = getenv("HOME");
-		path = appdata + "/Reitek/Contact/BrowserPlugin";
-#endif
-		
-		audio_manager_ = boost::make_shared<BlabbleAudioManager>(path);
-
-		BLABBLE_LOG_DEBUG("PjsuaManager startup complete.");
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		BLABBLE_LOG_DEBUG(" INFO:                 PjsuaManager startup complete");
 	}
 	catch (std::runtime_error& e)
 	{
-		std::string str = "Error in PjsuaManager. " + boost::lexical_cast<std::string>(e.what());
+		std::string str = "Error during PjsuaManager startup: " + boost::lexical_cast<std::string>(e.what());
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 		//BLABBLE_LOG_ERROR("Error in PjsuaManager. " << e.what());
 		pjsua_destroy();
@@ -365,19 +454,6 @@ void PjsuaManager::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED)
 		{
-			// REITEK: Dump call statistics
-
-			std::string dbgstr = "Dumping statistics for PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
-			BlabbleLogging::blabbleLog(0, dbgstr.c_str(), 0);
-
-			char stats_buf[STATS_BUF_SIZE];
-			memset(stats_buf, 0, STATS_BUF_SIZE);
-
-			pjsua_call_dump(call_id, PJ_TRUE, stats_buf, STATS_BUF_SIZE, "  ");
-			stats_buf[STATS_BUF_SIZE - 1] = '\0';
-
-			BlabbleLogging::blabbleLog(0, stats_buf, 0);
-
 			//Just make sure we get rid of the call
 			pjsua_call_hangup(call_id, 0, NULL, NULL);
 		}

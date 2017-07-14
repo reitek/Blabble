@@ -113,7 +113,11 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief A write only JavaScript property used to set the callback function for when a call has ended.
 		 */
 		void set_on_call_end(const FB::JSObjectPtr& v) { on_call_end_ = v; }
-		
+
+		/*! @Brief A write only JavaScript property used to set the callback function for when a call has ended providing the PJSIP statistics.
+		*/
+		void set_on_call_end_statistics(const FB::JSObjectPtr& v) { on_call_end_statistics_ = v; }
+
 		/*! @Brief A write only JavaScript property used to set the callback function to notify of the status of a transfer.
 		 */
 		void set_on_transfer_status(const FB::JSObjectPtr& v) { on_transfer_status_ = v; }
@@ -180,6 +184,7 @@ class BlabbleCall : public FB::JSAPIAuto
 		FB::JSObjectPtr on_call_connected_;
 		FB::JSObjectPtr on_call_ringing_;
 		FB::JSObjectPtr on_call_end_;
+		FB::JSObjectPtr on_call_end_statistics_;
 		FB::JSObjectPtr on_transfer_status_;
 
 		void StopRinging();
@@ -196,7 +201,8 @@ class BlabbleCall : public FB::JSAPIAuto
 		static unsigned int GetNextId();
 
 		void CallOnCallEnd();
-		void CallOnCallEnd(pjsip_status_code status);
+		void CallOnCallEndStatus(pjsip_status_code status);
+		void CallOnCallEndStatistics(std::string statistics);
 		void CallOnTransferStatus(int status);
 };
 

@@ -89,6 +89,9 @@ void BlabbleAccount::Register()
 			acc_cfg.proxy[acc_cfg.proxy_cnt++] = pj_str(const_cast<char *>(proxyURL_.c_str()));
 		}
 
+		// REITEK: Use signalling interface for media
+		acc_cfg.rtp_cfg.media_from_signalling_interface = PJ_TRUE;
+
 		status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &id_);
 
 		if (status != PJ_SUCCESS)
