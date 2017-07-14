@@ -16,6 +16,14 @@ Copyright 2012 Andrew Ofisher
 #include "BlabbleLogging.h"
 #include "FBWriteOnlyProperty.h"
 
+
+#if defined(PJMEDIA_HAS_RTCP_XR) && (PJMEDIA_HAS_RTCP_XR != 0)
+#   define STATS_BUF_SIZE	(1024 * 10)
+#else
+#   define STATS_BUF_SIZE	(1024 * 3)
+#endif
+
+
 /*! @Brief Static call counter to keep track of calls.
  */
 unsigned int BlabbleCall::id_counter_ = 0;
@@ -57,6 +65,7 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 
 	registerProperty("onCallConnected", make_write_only_property(this, &BlabbleCall::set_on_call_connected));
 	registerProperty("onCallEnd", make_write_only_property(this, &BlabbleCall::set_on_call_end));
+	registerProperty("onCallEndStatistics", make_write_only_property(this, &BlabbleCall::set_on_call_end_statistics));
 }
 
 void BlabbleCall::StopRinging()
@@ -82,7 +91,7 @@ void BlabbleCall::StartOutRinging()
 	if (!ringing_)
 	{
 		ringing_ = true;
-		audio_manager_->StartRing();
+		audio_manager_->StartOutRing();
 	}
 }
 
@@ -130,6 +139,12 @@ void BlabbleCall::CallOnCallEndStatus(pjsip_status_code status)
 {
 	//on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
 	on_call_end_->Invoke("", { BlabbleCallWeakPtr(get_shared()), status } );
+}
+
+void BlabbleCall::CallOnCallEndStatistics(std::string statistics)
+{
+	//on_call_end_statistics_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(statistics));
+	on_call_end_statistics_->Invoke("", { BlabbleCallWeakPtr(get_shared()), statistics });
 }
 
 void BlabbleCall::CallOnTransferStatus(int status)
@@ -342,6 +357,9 @@ bool BlabbleCall::Answer()
 	if (!p)
 		return false;
 
+	// Stop playing the wav file not related to a call
+	audio_manager_->StopWav();
+
 	StopRinging();
 
 	std::string str = "Answering PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+" associated to BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_);
@@ -363,29 +381,67 @@ bool BlabbleCall::Hold()
 	return status == PJ_SUCCESS;
 }
 
+static bool IsValidDtmf(char c)
+{
+	const char lc = tolower(c);
+
+	if ((lc >= '0' && lc <= '9') || (lc == '*') || (lc == '#') || (lc >= 'a' && lc <= 'd'))
+		return true;
+
+	return false;
+}
+
+
 bool BlabbleCall::SendDTMF(const std::string& dtmf)
 {
-	BlabbleAccountPtr p;
-	char c;
-	pj_str_t digits;
-	pj_status_t status;
-
+#if 0	// REITEK: Sending more than 1 dtmf is valid
 	if (dtmf.length() != 1)
 	{
 		throw FB::script_error("SendDTMF may only send one character!");
 	}
-	
+#endif
+
+#if 0	// REITEK: Allowed digits are those internally supported by pjmedia_stream_dial_dtmf ('0'-'9','*','#','a'-'d') except for 'r' (flash)
+	char c;
+
 	c = dtmf[0];
 	if (c != '#' && c != '*' && c < '0' && c > '9')
 	{
 		throw FB::script_error("SendDTMF may only send numbers, # and *");
 	}
 
+	digits.ptr = &c;
+	digits.slen = 1;
+#endif
+
+	std::string valid_digits;
+	std::string invalid_digits;
+	for (std::size_t i = 0, max = dtmf.length(); i < max; i++)
+	{
+		if (IsValidDtmf(dtmf[i]))
+			valid_digits += dtmf[i];
+		else
+			invalid_digits += dtmf[i];
+	}
+
+	if (invalid_digits.length() > 0)
+	{
+		std::string str = "WARNING: Discarded characters not valid for SendDTMF: " + invalid_digits;
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	pj_str_t digits;
+
+	digits.ptr = const_cast<char*>(valid_digits.c_str());
+	digits.slen = valid_digits.length();
+
+	BlabbleAccountPtr p;
+
 	if (!(p = CheckAndGetParent()))
 		return false;
 
-	digits.ptr = &c;
-	digits.slen = 1;
+	pj_status_t status;
+
 	status = pjsua_call_dial_dtmf(call_id_, &digits);
 
 	return status == PJ_SUCCESS;
@@ -561,6 +617,25 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED) 
 		{
+			// REITEK: Dump call statistics
+
+			std::string dbgstr = "Dumping statistics for PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+			BlabbleLogging::blabbleLog(0, dbgstr.c_str(), 0);
+
+			char stats_buf[STATS_BUF_SIZE];
+			memset(stats_buf, 0, STATS_BUF_SIZE);
+
+			pjsua_call_dump(call_id, PJ_TRUE, stats_buf, STATS_BUF_SIZE, "  ");
+			stats_buf[STATS_BUF_SIZE - 1] = '\0';
+
+			BlabbleLogging::blabbleLog(0, stats_buf, 0);
+
+			if (on_call_end_statistics_)
+			{
+				BlabbleCallPtr call = get_shared();
+				on_call_end_statistics_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEndStatistics, call, stats_buf));
+			}
+
 			RemoteEnd(info);
 		}
 		else if (info.state == PJSIP_INV_STATE_CALLING)

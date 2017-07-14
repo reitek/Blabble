@@ -52,6 +52,12 @@ BlabbleAPI::BlabbleAPI(const FB::BrowserHostPtr& host, const PjsuaManagerPtr& ma
 	registerMethod("logSender", make_method(this, &BlabbleAPI::ZipSender));
 	registerMethod("setCodecPriority", make_method(this, &BlabbleAPI::SetCodecPriority));
 	registerMethod("setLogPath", make_method(this, &BlabbleAPI::setLogPath));
+	registerMethod("setRingAudioDevice", make_method(this, &BlabbleAPI::setRingAudioDevice));
+	registerMethod("getRingAudioDevice", make_method(this, &BlabbleAPI::getRingAudioDevice));
+	registerMethod("setRingVolume", make_method(this, &BlabbleAPI::setRingVolume));
+	registerMethod("getRingVolume", make_method(this, &BlabbleAPI::getRingVolume));
+	registerMethod("setRingSound", make_method(this, &BlabbleAPI::setRingSound));
+	registerMethod("getRingSound", make_method(this, &BlabbleAPI::getRingSound));
 }
 
 BlabbleAPI::~BlabbleAPI()
@@ -134,9 +140,9 @@ BlabbleAccountPtr BlabbleAPI::FindAcc(int acc_id)
 	return manager_->FindAcc(acc_id);
 }
 
-bool BlabbleAPI::PlayWav(const std::string& fileName)
+bool BlabbleAPI::PlayWav(FB::VariantMap playWavParams)
 {
-	return manager_->audio_manager()->StartWav(fileName);
+	return manager_->audio_manager()->PlayWav(playWavParams);
 }
 
 void BlabbleAPI::StopWav()
@@ -203,27 +209,22 @@ FB::VariantMap BlabbleAPI::GetCurrentAudioDevice()
 
 bool BlabbleAPI::SetAudioDevice(int capture, int playback)
 {
+	// REITEK: Check the currently set capture and playback device: if they are the same, there is no need to set them
+	int captureId, playbackId;
+
+	pj_status_t status = pjsua_get_snd_dev(&captureId, &playbackId);
+	if (status == PJ_SUCCESS)
+	{
+		if ((captureId == capture) && (playbackId == playback))
+			return true;
+	}
+
 	return PJ_SUCCESS == pjsua_set_snd_dev(capture, playback);
 }
 
 FB::VariantMap BlabbleAPI::GetVolume()
 {
-#if 0
-	pjmedia_conf_port_info info;
-#endif
 	FB::VariantMap map;
-#if 0
-	pj_status_t status = pjmedia_conf_get_port_info(pjsua_var.mconf, 0, &info);
-	if (status == PJ_SUCCESS)
-	{
-		map["outgoingVolume"] = ((float)info.rx_adj_level) / 128 + 1;
-		map["incomingVolume"] = ((float)info.tx_adj_level) / 128 + 1;
-	} 
-	else 
-	{
-		map["error"] = status;
-	}
-#endif
 
 	// REITEK: Use PJSUA API to get the current volume
 	pjsua_conf_port_info info;
@@ -322,3 +323,33 @@ void BlabbleAPI::SetCodecPriorityAll(std::map<std::string,int> codecMap)
 	PjsuaManager::SetCodecPriorityAll(codecMap);
 }
 */
+
+bool BlabbleAPI::setRingAudioDevice(FB::variant deviceId)
+{
+	return manager_->audio_manager()->SetRingAudioDevice(deviceId);
+}
+
+int BlabbleAPI::getRingAudioDevice()
+{
+	return manager_->audio_manager()->GetRingAudioDevice();
+}
+
+bool BlabbleAPI::setRingVolume(FB::variant volume)
+{
+	return manager_->audio_manager()->SetRingVolume(volume);
+}
+
+FB::variant BlabbleAPI::getRingVolume()
+{
+	return manager_->audio_manager()->GetRingVolume();
+}
+
+bool BlabbleAPI::setRingSound(FB::variant filePath)
+{
+	return manager_->audio_manager()->SetRingSound(filePath);
+}
+
+const std::string BlabbleAPI::getRingSound()
+{
+	return manager_->audio_manager()->GetRingSound();
+}

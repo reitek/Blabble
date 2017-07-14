@@ -1,8 +1,4 @@
-#/**********************************************************\ 
-#
-# Auto-Generated Plugin Configuration file
-# for Reitek PluginSIP
-#\**********************************************************/
+#  Configuration file for Reitek PluginSIP
 
 set(PLUGIN_NAME "PluginSIP")
 set(PLUGIN_PREFIX "PS")
@@ -11,21 +7,21 @@ set(COMPANY_REVDOMAIN "com.reitek")
 # NOTE: If you are going to deploy your own extension you *must* change the
 #       key and ID to your own key and matching ID.  You can use cmake/makeid.py
 #       (https://gist.github.com/taxilian/d42b8768b2e3ef5c6998) to generate them
-set(PLUGIN_CRX_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
+set(PLUGIN_CRX_NAME "${COMPANY_REVDOMAIN}.pluginsip")
 set(PLUGIN_CRX_KEY "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDVd2HTm3jc05eJiizFvPK7Ta7dG4iguLggWzfdW4/hQCnzs/YWF0J8Cjclzw4gvegEBPKYkq/e1BaujqKMd0QA/Xk/5d8hFMeaVtQYuEe76wB2vdJn7mT+vhpkuIwBvy0aLRpRISlH3Xzu6k8nBBK0TWzuBwbeuRJ4S98Gn+2FVwIDAQAB")
 set(PLUGIN_CRX_ID "igpaogmmhnicmonampjhibhcdpgjoffo")
-set(PLUGIN_CRX_WYRMHOLE_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
-set(PLUGIN_CRX_NATIVEHOST_NAME "${COMPANY_REVDOMAIN}.${PLUGIN_NAME}")
-set(PLUGIN_CRX_NATIVEHOST_DESCRIPTION "${COMPANY_REVDOMAIN}.${PLUGIN_NAME} Native Messaging Host")
+set(PLUGIN_CRX_WYRMHOLE_NAME "${COMPANY_REVDOMAIN}.pluginsip")
+set(PLUGIN_CRX_NATIVEHOST_NAME "${COMPANY_REVDOMAIN}.pluginsip")
+set(PLUGIN_CRX_NATIVEHOST_DESCRIPTION "${COMPANY_REVDOMAIN}.pluginsip Native Messaging Host")
 
 # ActiveX constants:
 set(FBTYPELIB_NAME PjsipJsLib)
-set(FBTYPELIB_DESC "PluginSIP 1.0 Type Library")
-set(IFBControl_DESC "PluginSIP Control Interface")
-set(FBControl_DESC "PluginSIP Control Class")
-set(IFBComJavascriptObject_DESC "PluginSIP IComJavascriptObject Interface")
-set(FBComJavascriptObject_DESC "PluginSIP ComJavascriptObject Class")
-set(IFBComEventSource_DESC "PluginSIP IFBComEventSource Interface")
+set(FBTYPELIB_DESC "${PLUGIN_NAME} 1.0 Type Library")
+set(IFBControl_DESC "${PLUGIN_NAME} Control Interface")
+set(FBControl_DESC "${PLUGIN_NAME} Control Class")
+set(IFBComJavascriptObject_DESC "${PLUGIN_NAME} IComJavascriptObject Interface")
+set(FBComJavascriptObject_DESC "${PLUGIN_NAME} ComJavascriptObject Class")
+set(IFBComEventSource_DESC "${PLUGIN_NAME} IFBComEventSource Interface")
 set(AXVERSION_NUM "1")
 
 # NOTE: THESE GUIDS *MUST* BE UNIQUE TO YOUR PLUGIN/ACTIVEX CONTROL!  YES, ALL OF THEM!
@@ -42,16 +38,16 @@ else ( FB_PLATFORM_ARCH_32 )
 endif ( FB_PLATFORM_ARCH_32 )
 
 # these are the pieces that are relevant to using it from Javascript
-set(ACTIVEX_PROGID "Reitek.PluginSIP")
-set(MOZILLA_PLUGINID "Reitek@PluginSIP.com")
+set(ACTIVEX_PROGID "Reitek.${PLUGIN_NAME}")
+set(MOZILLA_PLUGINID "Reitek@${PLUGIN_NAME}.com")
 
 # strings
-set(FBSTRING_CompanyName "Reitek S.p.A.")
-set(FBSTRING_PLUGIN_VERSION "1.0.4.0")
-set(FBSTRING_LegalCopyright "Copyright 2014 Reitek S.p.A. & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
+set(FBSTRING_CompanyName "${COMPANY_NAME}")
+set(FBSTRING_PLUGIN_VERSION "1.0.4.8")
+set(FBSTRING_LegalCopyright "Copyright 2014 ${COMPANY_NAME} & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
-set(FBSTRING_ProductName "PluginSIP")
-set(FBSTRING_PluginName "PluginSIP")  # No 32bit postfix to maintain backward compatability.
+set(FBSTRING_ProductName "${PLUGIN_NAME}")
+set(FBSTRING_PluginName "${PLUGIN_NAME}")  # No 32bit postfix to maintain backward compatability.
 set(FBSTRING_FileExtents "")
 set(FBSTRING_PluginDescription "JS Bridge for PJSIP based on Blabble")
 set(FBSTRING_MIMEType "application/x-pluginSIP")

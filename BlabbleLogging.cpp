@@ -48,19 +48,19 @@ namespace BlabbleLogging {
 	std::string extensionLOG = ".log";
 	std::string extensionZIP = ".zip";
 	#if defined(XP_WIN)
-		std::string nameAD = "\\AgentDesktop_";
-		std::string nameSIP = "\\PluginSIP_";
-		std::string nameZIP = "\\npPlugin_";
-		std::string folder = "\\Reitek\\Contact\\BrowserPlugin";
-		std::string appdata = getenv("AppData");
-		std::string filepath = appdata + folder;
+	std::string nameAD = "\\AgentDesktop_";
+	std::string nameSIP = "\\PluginSIP_";
+	std::string nameZIP = "\\npPlugin_";
+	std::string folder = "\\Reitek\\Contact\\BrowserPlugin";
+	std::string appdata = getenv("AppData");
+	std::string filepath = appdata + folder;
 	#elif defined(XP_UNIX)
-		std::string nameAD = "/AgentDesktop_";
-		std::string nameSIP = "/PluginSIP_";
-		std::string nameZIP = "/npPlugin_";
-		std::string folder = "/Reitek/Contact/BrowserPlugin";
-		std::string appdata = getenv("HOME");
-		std::string filepath = appdata + folder;
+	std::string nameAD = "/AgentDesktop_";
+	std::string nameSIP = "/PluginSIP_";
+	std::string nameZIP = "/npPlugin_";
+	std::string folder = "/Reitek/Contact/BrowserPlugin";
+	std::string appdata = getenv("HOME");
+	std::string filepath = appdata + folder;
 	#endif
 
 	std::string filepathAD;
@@ -363,12 +363,12 @@ void BlabbleLogging::checkHistoricalLogAD()
 	{
 		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Next file: " + counter.at(i));
 		#if (XP_WIN)
-			std::string path = BlabbleLogging::filepath + "\\" + counter.at(i);
-			BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Removed: " + path);
-			std::remove(path.c_str());
+		std::string path = BlabbleLogging::filepath + "\\" + counter.at(i);
+		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Removed: " + path);
+		std::remove(path.c_str());
 		#elif (XP_UNIX)
-			std::string path = BlabbleLogging::filepath + "/" + counter.at(i);
-			std::remove(path.c_str());
+		std::string path = BlabbleLogging::filepath + "/" + counter.at(i);
+		std::remove(path.c_str());
 		#endif
 		count--;
 	}
@@ -384,12 +384,12 @@ void BlabbleLogging::checkHistoricalLogSIP() {
 	{
 		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Next file: " + counter.at(i));
 		#if (XP_WIN)
-			std::string path = BlabbleLogging::filepath + "\\" + counter.at(i);
-			BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Removed: " + path);
-			std::remove(path.c_str());
+		std::string path = BlabbleLogging::filepath + "\\" + counter.at(i);
+		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Removed: " + path);
+		std::remove(path.c_str());
 		#elif (XP_UNIX)
-			std::string path = BlabbleLogging::filepath + "/" + counter.at(i);
-			std::remove(path.c_str());
+		std::string path = BlabbleLogging::filepath + "/" + counter.at(i);
+		std::remove(path.c_str());
 		#endif
 		count--;
 	}
@@ -445,17 +445,37 @@ std::string BlabbleLogging::createZIP()
 	 * Add file da zippare
 	 */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Add File da Zippare");
-	ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, logPathAD, thisAD, std::string());
-	ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, logPathSIP, thisSIP, std::string());
+
+	try {
+		ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, logPathAD, thisAD, std::string());
+	}
+	catch (std::exception& e) {
+		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] [NOTICE]: Impossibile aggiungere il file " + logPathAD + " al file " + BlabbleLogging::filepathZIP + ": " + e.what());
+	}
+
+	try {
+		ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, logPathSIP, thisSIP, std::string());
+	}
+	catch (std::exception& e) {
+		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] [NOTICE]: Impossibile aggiungere il file " + logPathSIP + " al file " + BlabbleLogging::filepathZIP + ": " + e.what());
+	}
+
 	int i = 0;
 	while (i < logAD.size()) 
 	{
 		#if (XP_WIN)
-				std::string thiszipAD = BlabbleLogging::filepath + "\\" + logAD[i];
+		std::string thiszipAD = BlabbleLogging::filepath + "\\" + logAD[i];
 		#elif (XP_UNIX)
 		std::string thiszipAD = BlabbleLogging::filepath + "/" + logAD[i];
 		#endif
-		ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, thiszipAD, logAD[i], std::string());
+
+		try {
+			ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, thiszipAD, logAD[i], std::string());
+		}
+		catch (std::exception& e) {
+			BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] [NOTICE]: Impossibile aggiungere il file " + thiszipAD + " al file " + BlabbleLogging::filepathZIP + ": " + e.what());
+		}
+
 		i++;
 	}
 	i = 0;
@@ -463,11 +483,18 @@ std::string BlabbleLogging::createZIP()
 	while (i < logSIP.size()) 
 	{
 		#if (XP_WIN)
-				std::string thiszipSIP = BlabbleLogging::filepath + "\\" + logSIP[i];
+		std::string thiszipSIP = BlabbleLogging::filepath + "\\" + logSIP[i];
 		#elif (XP_UNIX)
-			std::string thiszipSIP = BlabbleLogging::filepath + "/" + logSIP[i];
+		std::string thiszipSIP = BlabbleLogging::filepath + "/" + logSIP[i];
 		#endif
+
+		try {
 			ZipFile::AddEncryptedFile(BlabbleLogging::filepathZIP, thiszipSIP, logSIP[i], std::string());
+		}
+		catch (std::exception& e) {
+			BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] [NOTICE]: Impossibile aggiungere il file " + thiszipSIP + " al file " + BlabbleLogging::filepathZIP + ": " + e.what());
+		}
+
 		i++;
 	}
 
@@ -501,54 +528,80 @@ void BlabbleLogging::sendZip(std::string host)
 	}
 	/* Memorizzazione della dimensione del file */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Memorizzazione della dimensione del file");
+
 	fseek(zipFile, 0, SEEK_END);
 	unsigned long zipSize = ftell(zipFile);
 	fseek(zipFile, 0, SEEK_SET);
+
 	/* Preparazione del file da inviare */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Preparazione del file da inviare");
+
+	struct curl_slist *headers = NULL;
+
 	CURL *easyhandle = curl_easy_init();
 	if (easyhandle)
 	{
+		/* no progress meter please */
+		curl_easy_setopt(easyhandle, CURLOPT_NOPROGRESS, 1L);
+
 		/* Abilito Upload */
 		curl_easy_setopt(easyhandle, CURLOPT_UPLOAD, 1L);
+	
 		/* PUT */
 		curl_easy_setopt(easyhandle, CURLOPT_PUT, 1L);
+	
 		/* URL */
 		curl_easy_setopt(easyhandle, CURLOPT_URL, host.c_str());
+	
 		/* Set Content Type Header */
-		struct curl_slist *headers = NULL;
 		headers = curl_slist_append(headers, "Content-Type: application/zip");
+
 		curl_easy_setopt(easyhandle, CURLOPT_HTTPHEADER, headers);
+
 		/* Inserisco puntatore a file */
 		curl_easy_setopt(easyhandle, CURLOPT_INFILE, zipFile);
+
 		/* Indico dimensione del file */
 		curl_easy_setopt(easyhandle, CURLOPT_INFILESIZE_LARGE, (curl_off_t)zipSize);
+
+		/* Disable SSL certificates checking */
+		curl_easy_setopt(easyhandle, CURLOPT_SSL_VERIFYPEER, 0L);
 	}
+
 	/* Invio File */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Upload File @ " + host);
+
 	CURLcode result = curl_easy_perform(easyhandle);
+
+	// Free the headers
+	curl_slist_free_all(headers);
+
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Upload Terminato!");
+
 	/* Check Errori di Invio */
 	if (result != CURLE_OK)
 	{
 		BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] [ERROR] Errore nell'upload del file: " + boost::lexical_cast<std::string>(result)+" " + boost::lexical_cast<std::string>(curl_easy_strerror(result)));
 	}
+
 	/* Cleanup */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Cleanup");
+
 	curl_easy_cleanup(easyhandle);
+
 	/* Chiusura stream invio file */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Chiusura stream upload file");
+
 	fclose(zipFile);
-	/*  Global Cleanup */
-	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Global Cleanup");
-	curl_global_cleanup();
+
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Procedura di upload terminata!");
+
 	/* Rimozione File Zip */
 	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Rimozione File: " + zip);
-	std::remove(zip.c_str());
-	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Rimozione avvenuta con successo!");
-	
 
+	std::remove(zip.c_str());
+
+	BlabbleLogging::writeLogAD(" [" + boost::lexical_cast<std::string>(boost::this_thread::get_id()) + "] [PLUGIN] Rimozione avvenuta con successo!");
 }
 
 std::string BlabbleLogging::createDateTimeString() 
