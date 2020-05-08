@@ -13,7 +13,8 @@ Copyright 2012 Andrew Ofisher
 namespace FB { 
     namespace detail { 
 		namespace properties {
-			inline int dummyGetter()
+			//inline int dummyGetter()
+			inline variantPromise dummyGetter()
 			{
 				throw FB::script_error("Access denied.");
 			}

@@ -18,7 +18,9 @@ Copyright 2012 Andrew Ofisher
 
 #include <pjsua-lib/pjsua_internal.h>
 #include <string>
+#ifdef WIN32
 #include <io.h>
+#endif
 #include <stdio.h>
 #include <boost/optional.hpp>
 
@@ -131,10 +133,13 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 	pjsua_config cfg;
 	pjsua_logging_config log_cfg;
 	pjsua_media_config media_cfg;
-	pjsua_transport_config tran_cfg, tls_tran_cfg;
+	pjsua_transport_config tran_cfg, tls_tran_cfg, tran6_cfg, tls_tran6_cfg;
 
 	pjsua_transport_config_default(&tran_cfg);
 	pjsua_transport_config_default(&tls_tran_cfg);
+	pjsua_transport_config_default(&tran6_cfg);
+	pjsua_transport_config_default(&tls_tran6_cfg);
+
 	pjsua_media_config_default(&media_cfg);
 	pjsua_config_default(&cfg);
 	pjsua_logging_config_default(&log_cfg);
@@ -148,7 +153,9 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 	cfg.cb.on_call_state = &PjsuaManager::OnCallState;
 	cfg.cb.on_reg_state = &PjsuaManager::OnRegState;
 	cfg.cb.on_transport_state = &PjsuaManager::OnTransportState;
+#if 0	// REITEK: Disabled
 	cfg.cb.on_call_transfer_status = &PjsuaManager::OnCallTransferStatus;
+#endif
 	cfg.cb.on_call_tsx_state = &PjsuaManager::OnCallTsxState;
 
 	// REITEK: Default log level is 4
@@ -186,16 +193,43 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 	log_cfg.decor = PJ_LOG_HAS_SENDER | PJ_LOG_HAS_SPACE | PJ_LOG_HAS_LEVEL_TEXT | PJ_LOG_HAS_THREAD_ID | PJ_LOG_HAS_THREAD_SWC;
 	log_cfg.cb = BlabbleLogging::blabbleLog;
 
-	// REITEK: !!! CHECK: Make TLS port configurable ?
-	tls_tran_cfg.port = 0;
-	//tran_cfg.tls_setting.verify_server = PJ_TRUE;
-	tls_tran_cfg.tls_setting.timeout.sec = 5;
-	tls_tran_cfg.tls_setting.method = PJSIP_TLSV1_METHOD;
+	// UDP transport settings
 
 	tran_cfg.port = sipPort;
 
 	// REITEK: !!! CHECK: Make port range configurable ?
 	tran_cfg.port_range = 200;
+
+	// TLS transport settings
+
+	tls_tran_cfg.port = sipTlsPort;
+
+	// REITEK: !!! CHECK: Make port range configurable ?
+	tls_tran_cfg.port_range = 200;
+
+	// REITEK: Do not attempt to verify the server certificate until we understand how to do it
+	//tls_tran_cfg.tls_setting.verify_server = PJ_TRUE;
+	tls_tran_cfg.tls_setting.timeout.sec = 5;
+	tls_tran_cfg.tls_setting.method = PJSIP_TLSV1_METHOD;
+
+	// UDP (IPv6) transport settings
+
+	tran6_cfg.port = sipPort;
+
+	// REITEK: !!! CHECK: Make port range configurable ?
+	tran6_cfg.port_range = 200;
+
+	// TLS (IPv6) transport settings
+
+	tls_tran6_cfg.port = sipTlsPort;
+
+	// REITEK: !!! CHECK: Make port range configurable ?
+	tls_tran6_cfg.port_range = 200;
+
+	// REITEK: Do not attempt to verify the server certificate until we understand how to do it
+	//tls_tran6_cfg.tls_setting.verify_server = PJ_TRUE;
+	tls_tran6_cfg.tls_setting.timeout.sec = 5;
+	tls_tran6_cfg.tls_setting.method = PJSIP_TLSV1_METHOD;
 
 	media_cfg.no_vad = 1;
 	media_cfg.enable_ice = enableIce ? PJ_TRUE : PJ_FALSE;
@@ -219,6 +253,8 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 
 	pj_log_set_log_func(&log_func);
 
+	//pjsip_cfg()->endpt.resolve_hostname_to_get_interface = PJ_TRUE;
+
 	status = pjsua_create();
 	if (status != PJ_SUCCESS)
 		throw std::runtime_error("pjsua_create failed");
@@ -229,19 +265,42 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 
 	try
 	{
+		status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &tran_cfg, &this->udp_transport);
+		if (status != PJ_SUCCESS)
+			throw std::runtime_error("pjsua_transport_create failed for UDP transport");
+
 		// !!! CHECK: What about TCP without TLS?
 
 		status = pjsua_transport_create(PJSIP_TRANSPORT_TLS, &tls_tran_cfg, &this->tls_transport);
+		// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 		has_tls_ = status == PJ_SUCCESS;
 		if (!has_tls_) {
 			// !!! UGLY (should automatically conform to pjsip formatting)
 			BLABBLE_LOG_DEBUG(" WARN:                 pjsua_transport_create failed for TLS transport: TLS not enabled");
 			this->tls_transport = -1;
 		}
+#endif
 
-		status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &tran_cfg, &this->udp_transport);
+		// REITEK: TLS transport opening is now mandatory
 		if (status != PJ_SUCCESS)
-			throw std::runtime_error("pjsua_transport_create failed for UDP transport");
+			throw std::runtime_error("pjsua_transport_create failed for TLS transport");
+
+		// REITEK: Attempt to open IPv6 transports (but do not fail if they cannot be opened)
+
+		status = pjsua_transport_create(PJSIP_TRANSPORT_UDP6, &tran6_cfg, &this->udp6_transport);
+		if (status != PJ_SUCCESS)
+		{
+			BLABBLE_LOG_DEBUG(" WARN:                 pjsua_transport_create failed for UDP IPv6 transport: UDP IPv6 not enabled");
+			this->udp6_transport = -1;
+		}
+
+		status = pjsua_transport_create(PJSIP_TRANSPORT_TLS6, &tls_tran6_cfg, &this->tls6_transport);
+		if (status != PJ_SUCCESS)
+		{
+			BLABBLE_LOG_DEBUG(" WARN:                 pjsua_transport_create failed for TLS IPv6 transport: TLS IPv6 not enabled");
+			this->tls6_transport = -1;
+		}
 
 		status = pjsua_start();
 		if (status != PJ_SUCCESS)
@@ -531,6 +590,7 @@ void PjsuaManager::OnRegState(pjsua_acc_id acc_id)
 	}
 }
 
+#if 0	// REITEK: Disabled
 //Static
 void PjsuaManager::OnCallTransferStatus(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
 {
@@ -560,6 +620,7 @@ void PjsuaManager::OnCallTransferStatus(pjsua_call_id call_id, int st_code, cons
 		//BLABBLE_LOG_ERROR("PjsuaManager::OnCallTransferStatus failed to call pjsua_call_get_info for PJSIP call id: " << call_id << ", got status: " << status);
 	}
 }
+#endif
 
 /* non esposto, utile per sviluppi futuri */
 /*

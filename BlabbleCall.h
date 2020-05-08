@@ -60,7 +60,8 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief JavaScript method to answer a ringing call
 		 */
 		bool Answer();
-		
+
+#if 0	// REITEK: Disabled
 		/*! @Brief JavaScript method to put a call on hold (disconnect audio)
 		 */
 		bool Hold();
@@ -69,7 +70,8 @@ class BlabbleCall : public FB::JSAPIAuto
 		 *  @sa Hold
 		 */
 		bool Unhold();
-		
+#endif
+
 		/*! @Brief Called when the call was ended by us.
 		 */
 		void LocalEnd(); //Call ended by us, such as JS end
@@ -77,7 +79,8 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief Send a single DTMF tone (0-9, #, *).
 		 */
 		bool SendDTMF(const std::string& dtmf);
-		
+	
+#if 0	// REITEK: Disabled
 		/*! @Brief JavaScript method to join this call and arg together and remove us.
 		 */
 		bool TransferReplace(const BlabbleCallPtr& arg);
@@ -85,6 +88,7 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief JavaScript method to Blind transfer a call
 		 */
 		bool Transfer(const FB::VariantMap &params);
+#endif
 
 		/*! @Brief JavaScript property to expose the incoming caller id
 		 */
@@ -118,10 +122,12 @@ class BlabbleCall : public FB::JSAPIAuto
 		*/
 		void set_on_call_end_statistics(const FB::JSObjectPtr& v) { on_call_end_statistics_ = v; }
 
+#if 0	// REITEK: Disabled
 		/*! @Brief A write only JavaScript property used to set the callback function to notify of the status of a transfer.
 		 */
 		void set_on_transfer_status(const FB::JSObjectPtr& v) { on_transfer_status_ = v; }
-		
+#endif
+
 		/*! @Brief Returns the PJSIP account id
 		 */
 		int acct_id() const { return acct_id_; }
@@ -146,14 +152,16 @@ class BlabbleCall : public FB::JSAPIAuto
 		*/
 		void OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e);
 
+#if 0	// REITEK: Disabled
 		/*! @Brief Called by BlabbleAccount when PJSIP notifies us of the status of a transfer.
 		 */
 		bool OnCallTransferStatus(int status);
-		
+
 		/*! @Brief Called by BlabbleAccount to make an outbound call.
 		 */
 		pj_status_t MakeCall(const std::string& dest, const std::string& identity = "");
-		
+#endif
+
 		/*! @Brief Called by BlabbleAccount to buildup a BlabbleCall for an incoming call.
 
 			 REITEK: Added mustAnswerCall parameter for auto answer handling
@@ -185,7 +193,9 @@ class BlabbleCall : public FB::JSAPIAuto
 		FB::JSObjectPtr on_call_ringing_;
 		FB::JSObjectPtr on_call_end_;
 		FB::JSObjectPtr on_call_end_statistics_;
+#if 0	// REITEK: Disabled
 		FB::JSObjectPtr on_transfer_status_;
+#endif
 
 		void StopRinging();
 		void StartInRinging();
@@ -203,7 +213,9 @@ class BlabbleCall : public FB::JSAPIAuto
 		void CallOnCallEnd();
 		void CallOnCallEndStatus(pjsip_status_code status);
 		void CallOnCallEndStatistics(std::string statistics);
+#if 0	// REITEK: Disabled
 		void CallOnTransferStatus(int status);
+#endif
 };
 
 #endif //H_BlabbleCallAPI

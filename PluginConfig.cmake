@@ -43,7 +43,7 @@ set(MOZILLA_PLUGINID "Reitek@${PLUGIN_NAME}.com")
 
 # strings
 set(FBSTRING_CompanyName "${COMPANY_NAME}")
-set(FBSTRING_PLUGIN_VERSION "1.0.4.8")
+set(FBSTRING_PLUGIN_VERSION "1.0.8.0")
 set(FBSTRING_LegalCopyright "Copyright 2014 ${COMPANY_NAME} & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
 set(FBSTRING_ProductName "${PLUGIN_NAME}")

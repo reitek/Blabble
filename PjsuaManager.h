@@ -56,16 +56,24 @@ public:
 	void AddAccount(const BlabbleAccountPtr &account);
 	void RemoveAccount(pjsua_acc_id acc_id);
 	BlabbleAccountPtr FindAcc(int accId);
-	
+
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	/*! Return true if we have TLS/SSL capability.
 	 */
 	bool has_tls() { return has_tls_; }
+#endif
 
 	static void SetCodecPriority(const char* codec, int value);
 
 	//void SetCodecPriorityAll(std::vector<std::pair<std::string, int>> codecMap); ==> NON ESPOSTO
 	
 public:
+	pjsua_transport_id GetUDPTransportID() const { return udp_transport; }
+	pjsua_transport_id GetTLSTransportID() const { return tls_transport; }
+	pjsua_transport_id GetUDP6TransportID() const { return udp6_transport; }
+	pjsua_transport_id GetTLS6TransportID() const { return tls6_transport; }
+
 	/*! @Brief Callback for PJSIP.
 	 *  Called when an incoming call comes in on an account.
 	 */
@@ -96,16 +104,22 @@ public:
 	 */
 	static void OnTransportState(pjsip_transport *tp, pjsip_transport_state state, const pjsip_transport_state_info *info);
 
+#if 0	// REITEK: Disabled
 	/*! @Brief Callback for PJSIP.
 	 *  Called after a call is transfer to report the status.
 	 */
 	static void OnCallTransferStatus(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont);
+#endif
 
 private:
 	BlabbleAccountMap accounts_;
 	BlabbleAudioManagerPtr audio_manager_;
-	pjsua_transport_id udp_transport, tls_transport;
+	pjsua_transport_id udp_transport, tls_transport, udp6_transport, tls6_transport;
+
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	bool has_tls_;
+#endif
 
 	static PjsuaManagerWeakPtr instance_;
 

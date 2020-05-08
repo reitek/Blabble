@@ -25,7 +25,11 @@
 #include "ZipArchiveEntry.h"
 #include "streams/memstream.h"
 #include "methods/Bzip2Method.h"
+#ifdef WIN32
 #include "curl.h"
+#else
+#include <curl/curl.h>
+#endif
 #include <fstream>
 #include <cstdio>
 //#include <time.h>
@@ -509,6 +513,13 @@ std::string BlabbleLogging::createZIP()
 
 void BlabbleLogging::ZipSender(std::string host)
 { 
+	// !!! FIXME: Log handling must be remade to correctly work with multiple threads
+
+	// !!! NOTE: Allow running the logSender thread on Win32 (somehow the crash is avoided with the trick of using static runtime libraries
+#ifndef WIN32
+	return;
+#endif
+
 	boost::thread logSender(boost::bind(BlabbleLogging::sendZip, host));
 }
 
@@ -616,3 +627,4 @@ std::string BlabbleLogging::createDateTimeString()
 	/* Taglio la frazione al millisecondo */
 	return stream.str().substr(0,25);
 }
+

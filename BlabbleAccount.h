@@ -49,6 +49,8 @@ public:
 	 */
 	virtual ~BlabbleAccount();
 
+	// REITEK: Don't allow making a call on its own
+#if 0
 	/*! @Brief Called from JavaScript to make a new call
 	 *  This function will setup a new call and return a new Call JavaScript
 	 *  object. If destination is missing, a JavaScript exception is thrown.
@@ -56,7 +58,8 @@ public:
 	 *  with valid set to false and error set to the text error reason.
 	 */
 	FB::variant MakeCall(const FB::VariantMap &params);
-	
+#endif
+
 	/*! @Brief (Re)register with the server.
 	 *  Force a reregistration to the server or register after a previous unregister
 	 */
@@ -115,9 +118,11 @@ public:
 	*/
 	void OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, pjsip_event *e);
 
+#if 0	// REITEK: Disabled
 	/*! @Brief Called by PjsuaManager when a call in this account has transfered.
 	 */
 	bool OnCallTransferStatus(pjsua_call_id call_id, int status);
+#endif
 
 	/*! Brief Called by BlabbleCall when a call begins or ends ringing.
 	 */
@@ -133,8 +138,12 @@ public:
 	 */
 	void OnRemoteCallEnd(BlabbleCallPtr call, pjsua_call_id call_id, const pjsua_call_info& info);
 
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	bool use_tls() const { return use_tls_; }
 	void set_use_tls(bool v) { use_tls_ = v; }
+#endif
+
 	std::string server() const { return server_; }
 	void set_server(const std::string &v) { server_ = v; }
 	void set_username(const std::string &v) { username_ = v; }
@@ -146,7 +155,12 @@ public:
 	void set_retry_interval(int v) { retry_ = v; }
 	void set_on_incoming_call(const FB::JSObjectPtr &v) { on_incoming_call_ = v; }
 	void set_on_reg_state(const FB::JSObjectPtr &v) { on_reg_state_ = v; }
+
+	// REITEK: Don't allow making a call on its own
+#if 0
 	void set_default_identity(const std::string &i) { default_identity = i; }
+#endif
+
 	PjsuaManagerPtr GetManager();
 
 	// REITEK: Proxy URL
@@ -155,8 +169,17 @@ public:
 private:
 	pjsua_acc_id id_;
 	std::string server_; //!< Server's IP or DNS name
+
+	// REITEK: Don't allow making a call on its own
+#if 0
 	std::string default_identity;
+#endif
+
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	bool use_tls_;
+#endif
+
 	unsigned long ringing_call_;
 	PjsuaManagerWeakPtr pjsua_manager_;
 	boost::recursive_mutex calls_mutex_;

@@ -18,6 +18,7 @@ Copyright 2012 Andrew Ofisher
 #include "BlabbleLogging.h"
 #include <string>
 
+
 BlabbleAPIInvalid::BlabbleAPIInvalid(const char* err)
 { 
 	error_ = std::string(err);
@@ -31,8 +32,10 @@ BlabbleAPI::BlabbleAPI(const FB::BrowserHostPtr& host, const PjsuaManagerPtr& ma
 	registerMethod("playWav", make_method(this, &BlabbleAPI::PlayWav));
 	registerMethod("stopWav", make_method(this, &BlabbleAPI::StopWav));
 	registerMethod("log", make_method(this, &BlabbleAPI::Log));
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	registerProperty("tlsEnabled", make_property(this, &BlabbleAPI::has_tls));
-	
+#endif	
 
 	registerMethod("getAudioDevices", make_method(this, &BlabbleAPI::GetAudioDevices));
 	registerMethod("setAudioDevice", make_method(this, &BlabbleAPI::SetAudioDevice));
@@ -58,6 +61,8 @@ BlabbleAPI::BlabbleAPI(const FB::BrowserHostPtr& host, const PjsuaManagerPtr& ma
 	registerMethod("getRingVolume", make_method(this, &BlabbleAPI::getRingVolume));
 	registerMethod("setRingSound", make_method(this, &BlabbleAPI::setRingSound));
 	registerMethod("getRingSound", make_method(this, &BlabbleAPI::getRingSound));
+
+	registerProperty("accounts", make_property(this, &BlabbleAPI::accounts));
 }
 
 BlabbleAPI::~BlabbleAPI()
@@ -93,10 +98,15 @@ BlabbleAccountWeakPtr BlabbleAPI::CreateAccount(const FB::VariantMap &params)
 		if ((iter = params.find("password")) != params.end())
 			account->set_password(iter->second.cast<std::string>());
 
+		// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 		if ((iter = params.find("useTls")) != params.end() &&
 			iter->second.is_of_type<bool>())
 		{
 			account->set_use_tls(iter->second.cast<bool>());
+
+			const std::string str = "DEBUG:                 " + std::string("useTls: ") + boost::lexical_cast<std::string>(account->use_tls());
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 		}
 
 		if ((iter = params.find("identity")) != params.end() &&
@@ -104,6 +114,7 @@ BlabbleAccountWeakPtr BlabbleAPI::CreateAccount(const FB::VariantMap &params)
 		{
 			account->set_default_identity(iter->second.cast<std::string>());
 		}
+#endif
 
 		if ((iter = params.find("onIncomingCall")) != params.end() &&
 			iter->second.is_of_type<FB::JSObjectPtr>())
@@ -150,6 +161,28 @@ void BlabbleAPI::StopWav()
 	manager_->audio_manager()->StopWav();
 }
 
+#ifdef WIN32
+std::string ANSI_to_UTF8(char * ansi)
+{
+	const int inlen = ::MultiByteToWideChar(CP_ACP, NULL, ansi, strlen(ansi), NULL, 0);
+	wchar_t* wszString = new wchar_t[inlen + 1];
+	::MultiByteToWideChar(CP_ACP, NULL, ansi, strlen(ansi), wszString, inlen);
+	wszString[inlen] = '\0';
+
+	const int outlen = ::WideCharToMultiByte(CP_UTF8, NULL, wszString, wcslen(wszString), NULL, 0, NULL, NULL);
+	char* utf8 = new char[outlen + 1];
+	::WideCharToMultiByte(CP_UTF8, NULL, wszString, wcslen(wszString), utf8, outlen, NULL, NULL);
+	utf8[outlen] = '\0';
+
+	std::string ret(utf8);
+
+	delete wszString;
+	delete utf8;
+
+	return ret;
+}
+#endif
+
 FB::VariantList BlabbleAPI::GetAudioDevices()
 {
 	unsigned int count = pjmedia_aud_dev_count();
@@ -160,7 +193,11 @@ FB::VariantList BlabbleAPI::GetAudioDevices()
 		for (unsigned int i = 0; i < count; i++)
 		{
 			FB::VariantMap map;
+#ifdef WIN32
+			map["name"] = ANSI_to_UTF8(audio_info[i].name);
+#else
 			map["name"] = std::string(audio_info[i].name);
+#endif
 			map["driver"] = std::string(audio_info[i].driver);
 			map["inputs"] = audio_info[i].input_count;
 			map["outputs"] = audio_info[i].output_count;
@@ -185,7 +222,11 @@ FB::VariantMap BlabbleAPI::GetCurrentAudioDevice()
 	{
 		status = pjmedia_aud_dev_get_info(captureId, &audio_info);
 		if (status == PJ_SUCCESS) {
+#ifdef WIN32
+			capInfo["name"] = ANSI_to_UTF8(audio_info.name);
+#else
 			capInfo["name"] = std::string(audio_info.name);
+#endif
 			capInfo["driver"] = std::string(audio_info.driver);
 			capInfo["inputs"] = audio_info.input_count;
 			capInfo["outputs"] = audio_info.output_count;
@@ -194,7 +235,11 @@ FB::VariantMap BlabbleAPI::GetCurrentAudioDevice()
 		}
 		status = pjmedia_aud_dev_get_info(playbackId, &audio_info);
 		if (status == PJ_SUCCESS) {
+#ifdef WIN32
+			playInfo["name"] = ANSI_to_UTF8(audio_info.name);
+#else
 			playInfo["name"] = std::string(audio_info.name);
+#endif
 			playInfo["driver"] = std::string(audio_info.driver);
 			playInfo["inputs"] = audio_info.input_count;
 			playInfo["outputs"] = audio_info.output_count;
@@ -352,4 +397,10 @@ bool BlabbleAPI::setRingSound(FB::variant filePath)
 const std::string BlabbleAPI::getRingSound()
 {
 	return manager_->audio_manager()->GetRingSound();
+}
+
+FB::VariantList BlabbleAPI::accounts()
+{
+	FB::VariantList accounts = FB::make_variant_list(accounts_);
+	return accounts;
 }

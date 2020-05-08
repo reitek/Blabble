@@ -7,6 +7,12 @@ cmake_minimum_required (VERSION 2.6)
 set (CMAKE_BACKWARDS_COMPATIBILITY 2.6)
 
 include(PluginConfig.cmake)
+
+# REITEK: Add our ENV lib directory in order to find the local libraries installed there
+if (UNIX)
+	link_directories($ENV{ENVDIR}/lib)
+endif()
+
 Project(${PLUGIN_NAME})
 
 set (FB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/firebreath CACHE PATH "Path to FireBreath Root")
@@ -32,68 +38,69 @@ file (GLOB GENERAL RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
 if (WIN32)
-include_directories(
-	${FB_PLUGIN_INCLUDE_DIRS}
-	${Boost_INCLUDE_DIRS}
-#	${FB_ROOT}\\src\\libs\\log4cplus\\include
-	\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
-	\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
-	\\..\\..\\..\\..\\env\\Win32\\include\\curl
-)
+	include_directories(
+		${FB_PLUGIN_INCLUDE_DIRS}
+		${Boost_INCLUDE_DIRS}
+		#${FB_ROOT}\\src\\libs\\log4cplus\\include
+		\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
+		\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
+		\\..\\..\\..\\..\\env\\Win32\\include\\curl
+	)
 
-set(FB_PLUGIN_INTERNAL_DEPS 
-	${FB_PLUGIN_INTERNAL_DEPS}
-	Iphlpapi.lib
-	netapi32.lib
-	mswsock.lib
-	ws2_32.lib
-)
+	set(FB_PLUGIN_INTERNAL_DEPS 
+		${FB_PLUGIN_INTERNAL_DEPS}
+		Iphlpapi.lib
+		netapi32.lib
+		mswsock.lib
+		ws2_32.lib
+	)
 
-add_definitions(-DPJ_WIN32=1)
-
+	add_definitions(-DPJ_WIN32=1)
 endif()
 
 if (UNIX)
+	find_package(PkgConfig)
 
-include_directories(
-	${FB_PLUGIN_INCLUDE_DIRS}
-)
+	# REITEK: Additional directory to locate PJSIP using pkgconfig
+	set(ENV{PKG_CONFIG_PATH} "$ENV{ENVDIR}/lib/pkgconfig")
 
-find_package(PkgConfig)
+	pkg_check_modules(PJSIP REQUIRED libpjproject)
+	pkg_check_modules(CURL REQUIRED libcurl)
 
-pkg_check_modules(PJSIP REQUIRED libpjproject)
+	include_directories(
+		${FB_PLUGIN_INCLUDE_DIRS}
+		${PJSIP_INCLUDEDIR}
+		$ENV{ENVDIR}/include/ziplib
+		${CURL_INCLUDEDIR}
+	)
 
-set(FB_PLUGIN_INTERNAL_DEPS 
-	${FB_PLUGIN_INTERNAL_DEPS}
-	${PJSIP_LIBRARIES}
-)
+	set(FB_PLUGIN_INTERNAL_DEPS 
+		${FB_PLUGIN_INTERNAL_DEPS}
+	)
 
-#Add GCC debug flags when in debug build
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O0 -g3" )
-
+	#Add GCC debug flags when in debug build
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O0 -g3" )
 endif()
 
 if (APPLE)
+	find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
+	find_library(AUDIOUNIT_LIBRARY AudioUnit)
+	find_library(COREAUDIO_LIBRARY CoreAudio)
 
-find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
-find_library(AUDIOUNIT_LIBRARY AudioUnit)
-find_library(COREAUDIO_LIBRARY CoreAudio)
-
-mark_as_advanced(AUDIOTOOLBOX_LIBRARY
+	mark_as_advanced(AUDIOTOOLBOX_LIBRARY
 				AUDIOUNIT_LIBRARY
 				COREAUDIO_LIBRARY)
-set(EXTRA_LIBS ${AUDIOTOOLBOX_LIBRARY} ${AUDIOUNIT_LIBRARY} ${COREAUDIO_LIBRARY})
+	set(EXTRA_LIBS ${AUDIOTOOLBOX_LIBRARY} ${AUDIOUNIT_LIBRARY} ${COREAUDIO_LIBRARY})
 
-include_directories(
-	${FB_PLUGIN_INCLUDE_DIRS}
-	/usr/local/include
-)
+	include_directories(
+		${FB_PLUGIN_INCLUDE_DIRS}
+		/usr/local/include
+	)
 
-set(FB_PLUGIN_INTERNAL_DEPS 
-	${FB_PLUGIN_INTERNAL_DEPS}
-	${EXTRA_LIBS}
-)
-
+	set(FB_PLUGIN_INTERNAL_DEPS 
+		${FB_PLUGIN_INTERNAL_DEPS}
+		${EXTRA_LIBS}
+	)
 endif()
 	
 # Generated files are stored in ${GENERATED} by the project configuration
