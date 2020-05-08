@@ -47,15 +47,15 @@ add_windows_plugin(${PROJECT_NAME} SOURCES)
 # add library dependencies here; leave ${PLUGIN_INTERNAL_DEPS} there unless you know what you're doing!
 target_link_libraries(${PROJECT_NAME}
     ${PLUGIN_INTERNAL_DEPS}
-	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc12-Release.lib
-	debug $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc12-Debug.lib
+	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc14-Release.lib
+	debug $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libpjproject-i386-Win32-vc14-Debug.lib
 	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libcurls.lib
 	debug $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\libcurlsd.lib
 	optimized $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\ziplib.lib
 	debug $(MSBuildProjectDirectory)\\..\\..\\..\\..\\..\\env\\Win32\\lib\\ziplibd.lib
     )
 
-my_add_link_flags(${PROJECT_NAME} "/SAFESEH:NO")
+my_add_link_flags(${PROJECT_NAME} "/LIBPATH:\"$(MSBuildProjectDirectory)/../../../../../env/Win32/lib\" /SAFESEH:NO")
 
 set(WIX_HEAT_FLAGS
     -gg                 # Generate GUIDs

@@ -118,6 +118,7 @@ private:
 	bool using_inring_tone_;						// Flag for removing, when appropriate, in_ring_port from the conference 
 
 	std::string used_play_file_;					// Play file currently being used
+	bool used_play_loop_;							// Play loop currently being used
 
 	int old_capture_dev_;							// ID of the capture device used before changing it to the one to use separately for ring
 	int old_playback_dev_;							// ID of the playback device used before changing it to the one to use separately for ring

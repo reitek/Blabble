@@ -42,7 +42,7 @@ add_firebreath_library(log4cplus)
 # strings
 set(FBSTRING_CompanyName "Reitek S.p.A.")
 set(FBSTRING_PluginDescription "JS Bridge for PJSIP based on Blabble")
-set(FBSTRING_PLUGIN_VERSION "1.0.3.8")
+set(FBSTRING_PLUGIN_VERSION "1.0.7.0")
 set(FBSTRING_LegalCopyright "Copyright 2014 Reitek S.p.A. & (Blabble ONLY) Copyright 2010-2013 Andrew Ofisher")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
 set(FBSTRING_ProductName "PluginSIP")

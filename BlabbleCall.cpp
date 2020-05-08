@@ -53,11 +53,15 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 
 	registerMethod("answer", make_method(this, &BlabbleCall::Answer));
 	registerMethod("hangup", make_method(this, &BlabbleCall::LocalEnd));
+#if 0	// REITEK: Disabled
 	registerMethod("hold", make_method(this, &BlabbleCall::Hold));
 	registerMethod("unhold", make_method(this, &BlabbleCall::Unhold));
+#endif
 	registerMethod("sendDTMF", make_method(this, &BlabbleCall::SendDTMF));
+#if 0	// REITEK: Disabled
 	registerMethod("transferReplace", make_method(this, &BlabbleCall::TransferReplace));
 	registerMethod("transfer", make_method(this, &BlabbleCall::Transfer));
+#endif
 	
 	registerProperty("callerId", make_property(this, &BlabbleCall::caller_id));
 	registerProperty("isActive", make_property(this, &BlabbleCall::is_active));
@@ -144,10 +148,12 @@ void BlabbleCall::CallOnCallEndStatistics(std::string statistics)
 	on_call_end_statistics_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(statistics));
 }
 
+#if 0	// REITEK: Disabled
 void BlabbleCall::CallOnTransferStatus(int status)
 {
 	on_transfer_status_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
 }
+#endif
 
 //Ended by remote, could be becuase of an error
 void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
@@ -282,6 +288,9 @@ bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
 
 		//StartInRinging();
 
+		// !!! NOTE: This flag must be set else the call will NOT be answered
+		ringing_ = true;
+
 		Answer();
 	}
 	else
@@ -304,6 +313,7 @@ bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
 	return true;
 }
 
+#if 0	// REITEK: Disabled
 pj_status_t BlabbleCall::MakeCall(const std::string& dest, const std::string& identity)
 {
 	BlabbleAccountPtr p = parent_.lock();
@@ -346,11 +356,15 @@ pj_status_t BlabbleCall::MakeCall(const std::string& dest, const std::string& id
 
 	return status;
 }
+#endif
 
 bool BlabbleCall::Answer()
 {
 	BlabbleAccountPtr p = CheckAndGetParent();
 	if (!p)
+		return false;
+
+	if (!ringing_)
 		return false;
 
 	// Stop playing the wav file not related to a call
@@ -367,6 +381,7 @@ bool BlabbleCall::Answer()
 	return status == PJ_SUCCESS;
 }
 
+#if 0	// REITEK: Disabled
 bool BlabbleCall::Hold()
 {
 	BlabbleAccountPtr p = CheckAndGetParent();
@@ -376,6 +391,7 @@ bool BlabbleCall::Hold()
 	pj_status_t status = pjsua_call_set_hold(call_id_, NULL);
 	return status == PJ_SUCCESS;
 }
+#endif
 
 static bool IsValidDtmf(char c)
 {
@@ -443,6 +459,7 @@ bool BlabbleCall::SendDTMF(const std::string& dtmf)
 	return status == PJ_SUCCESS;
 }
 
+#if 0	// REITEK: Disabled
 bool BlabbleCall::Unhold()
 {
 	BlabbleAccountPtr p = CheckAndGetParent();
@@ -508,6 +525,7 @@ bool BlabbleCall::Transfer(const FB::VariantMap &params)
 	desturi.slen = destination.length();
 	return pjsua_call_xfer(call_id_, &desturi, NULL) == PJ_SUCCESS;
 }
+#endif
 
 std::string BlabbleCall::caller_id()
 {
@@ -745,6 +763,7 @@ void BlabbleCall::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, 
 	}
 }
 
+#if 0	// REITEK: Disabled
 bool BlabbleCall::OnCallTransferStatus(int status)
 {
 	if (call_id_ != INVALID_CALL) 
@@ -758,6 +777,7 @@ bool BlabbleCall::OnCallTransferStatus(int status)
 
 	return false;
 }
+#endif
 
 BlabbleAccountPtr BlabbleCall::CheckAndGetParent()
 {

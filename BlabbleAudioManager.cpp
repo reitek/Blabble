@@ -504,7 +504,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 
 	bool loop = false;
 
-#if 0	// !!! NOTE: loop is always disabled (it makes possible to restore audio device and audio volume in a predictable way)
+//#if 0	// !!! NOTE: loop is always disabled (it makes possible to restore audio device and audio volume in a predictable way)
 	iter = playWavParams.find("loop");
 	if (iter != playWavParams.end())
 	{
@@ -527,7 +527,13 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 
 		}
 	}
-#endif
+//#endif
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 " + std::string("loop: ") + boost::lexical_cast<std::string>(loop);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
 
 #if 0	// REITEK: Allow relative/absolute paths
 	std::string path = 
@@ -551,7 +557,8 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 
 	if (wav_player_ > -1)
 	{
-		if (wav_file_to_use != used_play_file_)
+		// If one of these change, the current wav player must be destroyed
+		if ((wav_file_to_use != used_play_file_) || (loop != used_play_loop_))
 			StopWav();
 		else
 		{
@@ -616,8 +623,12 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 		// !!! TODO: Error checking !!!
 		pjsua_player_get_port(wav_player_, &port);
 
-		// !!! TODO: Error checking !!!
-		pjmedia_wav_player_set_eof_cb(port, (void *)this, &on_playwav_done);
+		// Set the EOF callback only if playing with no loop (else it would be automatically stopped)
+		if (!loop)
+		{
+			// !!! TODO: Error checking !!!
+			pjmedia_wav_player_set_eof_cb(port, (void *)this, &on_playwav_done);
+		}
 	}
 
 	if (audioDevice > -1)
@@ -713,6 +724,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 	}
 
 	used_play_file_ = wav_file_to_use;
+	used_play_loop_ = loop;
 
 	return true;
 }

@@ -20,9 +20,14 @@ Copyright 2012 Andrew Ofisher
 #include <string>
 
 BlabbleAccount::BlabbleAccount(PjsuaManagerPtr manager) :  
-	ringing_call_(0), pjsua_manager_(manager), id_(-1), timeout_(60), retry_(15), use_tls_(false)
+	ringing_call_(0), pjsua_manager_(manager), id_(-1), timeout_(60), retry_(15)
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0	
+	, use_tls_(false)
+#endif
 {
-	registerMethod("makeCall", make_method(this, &BlabbleAccount::MakeCall));
+	// REITEK: Don't allow making a call on its own
+	//registerMethod("makeCall", make_method(this, &BlabbleAccount::MakeCall));
 	registerMethod("unregister", make_method(this, &BlabbleAccount::Unregister));
 	registerMethod("register", make_method(this, &BlabbleAccount::Register));
 	registerMethod("destroy", make_method(this, &BlabbleAccount::Destroy));
@@ -51,9 +56,53 @@ void BlabbleAccount::Register()
 		if (server_.empty())
 			throw std::runtime_error("Attempt to register account with no server host set.");
 
+		bool useTlsForRegistrar = false;
+
+		// REITEK: Handle pseudo-URI scheme for using TLS on the connection to the registrar
+		std::string server = server_;
+		if (!server.empty() && (server.find("tls:") == 0)) {
+			server = server.substr(4);
+			useTlsForRegistrar = true;
+		}
+
+		if (server.empty())
+			throw std::runtime_error("Attempt to register account with no server host set.");
+
+		std::string accId = "sip:" + username_ + "@" + server;
+
+		// REITEK: Check validity of id URL
+		if (pjsua_verify_sip_url(accId.c_str()) != 0) {
+			throw std::runtime_error(std::string("Attempt to register account using invalid username ") + username_ + " or server " + server);
+		}
+
+		std::string regUri = "sip:" + server;
+
+		// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
+		if (use_tls_) {
+			regUri += ";transport=TLS";
+		}
+#endif
+
+		if (useTlsForRegistrar) {
+			regUri += ";transport=TLS";
+		}
+
+		// REITEK: Check validity of reg URL
+		if (pjsua_verify_sip_url(regUri.c_str()) != 0) {
+			throw std::runtime_error(std::string("Attempt to register account using invalid server ") + server);
+		}
+
+		// REITEK: Handle pseudo-URI scheme for using TLS on the connection to the outbound proxy
+
+		std::string proxyURL = proxyURL_;
+		if (!proxyURL.empty() && (proxyURL.find("tls:") == 0)) {
+			proxyURL = "sip:" + proxyURL.substr(4) + ";transport=TLS";
+		}
+
 		// REITEK: Check validity of proxy URL
-		if (!proxyURL_.empty() && (pjsua_verify_sip_url(proxyURL_.c_str()) != 0)) {
-			throw std::runtime_error("Attempt to register account using invalid proxyURL");
+		if (!proxyURL.empty() && (pjsua_verify_sip_url(proxyURL.c_str()) != 0)) {
+			throw std::runtime_error(std::string("Attempt to register account using invalid proxyURL") + proxyURL);
 		}
 
 		PjsuaManagerPtr manager = GetManager();
@@ -62,12 +111,7 @@ void BlabbleAccount::Register()
 
 		pjsua_acc_config_default(&acc_cfg);
 
-		std::string accId = "sip:" + username_ + "@" + server_;
 		acc_cfg.id = pj_str(const_cast<char*>(accId.c_str()));
-
-		std::string regUri = "sip:" + server_;
-		if (use_tls_)
-			regUri += ";transport=tls";
 		acc_cfg.reg_uri = pj_str(const_cast<char*>(regUri.c_str()));
 		acc_cfg.reg_retry_interval = retry_;
 		acc_cfg.reg_timeout = timeout_;
@@ -85,12 +129,25 @@ void BlabbleAccount::Register()
 		acc_cfg.lock_codec = PJ_FALSE;
 
 		// REITEK: Set proxy URL
-		if (!proxyURL_.empty()) {
-			acc_cfg.proxy[acc_cfg.proxy_cnt++] = pj_str(const_cast<char *>(proxyURL_.c_str()));
+		if (!proxyURL.empty()) {
+			acc_cfg.proxy[acc_cfg.proxy_cnt++] = pj_str(const_cast<char *>(proxyURL.c_str()));
 		}
 
 		// REITEK: Use signalling interface for media
 		acc_cfg.rtp_cfg.media_from_signalling_interface = PJ_TRUE;
+
+#if 0	// REITEK: Attempt to bind the account to a specific IPv6 transport (only for testing purposes)
+		if (!useTlsForRegistrar)
+		{
+			/* Bind the account to IPv6 transport */
+			//acc_cfg.transport_id = manager->GetUDP6TransportID();
+		}
+		else
+		{
+			/* Bind the account to IPv6 transport */
+			//acc_cfg.transport_id = manager->GetTLS6TransportID();
+		}
+#endif
 
 		status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &id_);
 
@@ -201,6 +258,7 @@ void BlabbleAccount::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	}
 }
 
+#if 0	// REITEK: Disabled
 bool BlabbleAccount::OnCallTransferStatus(pjsua_call_id call_id, int status)
 {
 	BlabbleCallPtr call = FindCall(call_id);
@@ -215,6 +273,7 @@ bool BlabbleAccount::OnCallTransferStatus(pjsua_call_id call_id, int status)
 	//Stop getting notifications since we don't even have this call
 	return true;
 }
+#endif
 
 void BlabbleAccount::OnCallMediaState(pjsua_call_id call_id)
 {
@@ -293,6 +352,8 @@ void BlabbleAccount::OnRegState()
 		on_reg_state_->InvokeAsync("", FB::variant_list_of(BlabbleAccountWeakPtr(get_shared()))((long)info.status));
 }
 
+// REITEK: Don't allow making a call on its own
+#if 0
 FB::variant BlabbleAccount::MakeCall(const FB::VariantMap &params)
 {
 	std::string destination, identity, displayName;
@@ -387,6 +448,7 @@ FB::variant BlabbleAccount::MakeCall(const FB::VariantMap &params)
 
 	return errorCall;
 }
+#endif
 
 //JS Properties
 BlabbleCallWeakPtr BlabbleAccount::active_call()

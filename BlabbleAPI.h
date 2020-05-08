@@ -83,9 +83,12 @@ public:
 	 */
 	void Log(int level, const std::string msg);
 	
+	// REITEK: Disable TLS flag (TLS is handled differently)
+#if 0
 	/*! @Brief JavaScript property to determine if TLS support is available
 	 */
 	bool has_tls() { return manager_->has_tls(); }
+#endif
 
 	/*! @Brief JavaScript function to return an array of audio devices in the system
 	 */
@@ -166,6 +169,11 @@ public:
 
 	bool setRingSound(FB::variant filePath);
 	const std::string getRingSound();
+
+	/*! @Brief JavaScript property to return all accounts.
+	*  Returns an array of all accounts.
+	*/
+	FB::VariantList accounts();
 
 private:
 	FB::BrowserHostPtr browser_host_;
