@@ -24,11 +24,26 @@ Copyright 2012 Andrew Ofisher
 #include <stdio.h>
 #include <boost/optional.hpp>
 
+#define DEFAULT_OPTIONS_KEEP_ALIVE_DELAY_SEC	60
+#define DEFAULT_PERIODIC_EVENT_TIMEOUT_SEC		0
+#define MIN_PERIODIC_EVENT_TIMEOUT_SEC			10
+#define MIN_OPTIONS_KEEP_ALIVE_DELAY_SEC		20
+#define MAX_OPTIONS_KEEP_ALIVE_DELAY_SEC		600
+#define DEFAULT_ANSWER_TIMEOUT_SEC				150
+
 // REITEK: Internal log function for inhibiting built in pjsip logging
 static void log_func(int level, const char *data, int len) {}
 
 
+/**
+*	PjsuaManager static members
+*/
+
+int PjsuaManager::optionskatimeout_;
+int PjsuaManager::periodiceventtimeout_;
+int PjsuaManager::answertimeout_;
 PjsuaManagerWeakPtr PjsuaManager::instance_;
+
 
 PjsuaManagerPtr PjsuaManager::GetManager(Blabble& pluginCore)
 {
@@ -44,9 +59,13 @@ PjsuaManagerPtr PjsuaManager::GetManager(Blabble& pluginCore)
 
 PjsuaManager::PjsuaManager(Blabble& pluginCore)
 {
+	optionskatimeout_ = DEFAULT_OPTIONS_KEEP_ALIVE_DELAY_SEC;
+	periodiceventtimeout_ = DEFAULT_PERIODIC_EVENT_TIMEOUT_SEC;
+	answertimeout_ = DEFAULT_ANSWER_TIMEOUT_SEC;
+
 	// REITEK: Get/parse parameters passed to the plugin upon manager creation
 
-	boost::optional<std::string> logging, ice, ecalgo, loglevelparam;
+	boost::optional<std::string> logging, ice, ecalgo, optionskatimeout, periodiceventtimeout, answertimeout, loglevelparam;
 	bool enableIce = false;
 
 	if ((logging = pluginCore.getParam("logging")) && *logging == "true")
@@ -129,6 +148,59 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
+	if (optionskatimeout = pluginCore.getParam("optionskatimeout"))
+	{
+		int intval = std::stoi(*optionskatimeout);
+
+		if ((intval != 0) && (intval < MIN_OPTIONS_KEEP_ALIVE_DELAY_SEC))
+		{
+			intval = MIN_OPTIONS_KEEP_ALIVE_DELAY_SEC;
+		}
+		else if (intval > MAX_OPTIONS_KEEP_ALIVE_DELAY_SEC)
+		{
+			intval = MAX_OPTIONS_KEEP_ALIVE_DELAY_SEC;
+		}
+
+		optionskatimeout_ = intval;
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 optionskatimeout set to " + boost::lexical_cast<std::string>(optionskatimeout_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	if (periodiceventtimeout = pluginCore.getParam("periodiceventtimeout"))
+	{
+		int intval = std::stoi(*periodiceventtimeout);
+
+		if ((intval != 0) && (intval < MIN_PERIODIC_EVENT_TIMEOUT_SEC))
+		{
+			intval = MIN_PERIODIC_EVENT_TIMEOUT_SEC;
+		}
+
+		periodiceventtimeout_ = intval;
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 periodiceventtimeout set to " + boost::lexical_cast<std::string>(periodiceventtimeout_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	if (answertimeout = pluginCore.getParam("answertimeout"))
+	{
+		const int intval = std::stoi(*answertimeout);
+
+		answertimeout_ = intval;
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 answertimeout set to " + boost::lexical_cast<std::string>(answertimeout_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
 	pj_status_t status;
 	pjsua_config cfg;
 	pjsua_logging_config log_cfg;
@@ -146,7 +218,7 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 
 	// REITEK: Tweak maximum number of calls in order to also reduce memory usage (at most 1 active plus 1 for consultation are needed)
 	//cfg.max_calls = 511;
-	cfg.max_calls = 2;
+	cfg.max_calls = 2;	// !!! TODO: 1 call at most should be set instead
 
 	cfg.cb.on_incoming_call = &PjsuaManager::OnIncomingCall;
 	cfg.cb.on_call_media_state = &PjsuaManager::OnCallMediaState;
@@ -309,7 +381,6 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 		// REITEK: Codecs priority handling
 		pj_str_t tmpstr;
 
-		// !!! FIXME: Hardwired now in order to test G. 729
 		pjsua_codec_set_priority(pj_cstr(&tmpstr, "*"), 0);
 		pjsua_codec_set_priority(pj_cstr(&tmpstr, "g729"), 255);
 		pjsua_codec_set_priority(pj_cstr(&tmpstr, "pcmu"), 240);
@@ -339,9 +410,9 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 	}
 	catch (std::runtime_error& e)
 	{
-		std::string str = "Error during PjsuaManager startup: " + boost::lexical_cast<std::string>(e.what());
+		const std::string str = "Error during PjsuaManager startup: " + boost::lexical_cast<std::string>(e.what());
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("Error in PjsuaManager. " << e.what());
+
 		pjsua_destroy();
 		throw e;
 	}
@@ -411,9 +482,33 @@ void PjsuaManager::OnTransportState(pjsip_transport *tp, pjsip_transport_state s
 //Static
 void PjsuaManager::OnIncomingCall(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data *rdata)
 {
-	std::string str = "OnIncomingCall called for PJSIP account id: " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+	const std::string str = "OnIncomingCall called for PJSIP account id " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id " + boost::lexical_cast<std::string>(call_id);
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_TRACE("OnIncomingCall called for PJSIP account id: " << acc_id << ", PJSIP call id: " << call_id);
+
+	if (rdata != NULL)
+	{
+		/**
+		*	ENGHOUSE: If X-2X-CallUUID header is not present into the INVITE message, immediately refuse it
+		*/
+
+		/**
+		*	Intentional scope
+		*/
+		{
+			const pj_str_t hdrName = { "X-2X-CallUUID", 13 };
+			pjsip_generic_string_hdr* hdr = (pjsip_generic_string_hdr*)pjsip_msg_find_hdr_by_name(rdata->msg_info.msg, &hdrName, NULL);
+			if (hdr == NULL)
+			{
+				const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ": declining the incoming call";
+				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+				pjsua_call_hangup(call_id, 603, NULL, NULL);
+
+				return;
+			}
+		}
+	}
+
 	PjsuaManagerPtr manager = PjsuaManager::instance_.lock();
 
 	if (!manager)
@@ -437,24 +532,21 @@ void PjsuaManager::OnIncomingCall(pjsua_acc_id acc_id, pjsua_call_id call_id, pj
 			status = pjmedia_sdp_neg_set_prefer_remote_codec_order(call->inv->neg, PJ_FALSE);
 			if (status != PJ_SUCCESS)
 			{
-				std::string str = "Could not set codec negotiation preference on local side for PJSIP account id: " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+				const std::string str = "Could not set codec negotiation preference on local side for PJSIP account id " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id " + boost::lexical_cast<std::string>(call_id);
 				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-				//BLABBLE_LOG_ERROR("Could not set codec negotiation preference on local side for PJSIP account id: " << acc_id << ", PJSIP call id: " << call_id);
 			}
 		}
 		else
 		{
-			std::string str = "WARNING: NULL SDP negotiator: cannot set codec negotiation preference on local side for PJSIP account id: " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+			const std::string str = "WARNING: NULL SDP negotiator: cannot set codec negotiation preference on local side for PJSIP account id " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id " + boost::lexical_cast<std::string>(call_id);
 			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-			//BLABBLE_LOG_DEBUG("WARNING: NULL SDP negotiator: cannot set codec negotiation preference on local side for PJSIP account id: " << acc_id << ", PJSIP call id: " << call_id);
 		}
 
 		pjsip_dlg_dec_lock(dlg);
 	}
 	else {
-		std::string str = "Could not acquire lock to set codec negotiation preference on local side for PJSIP account id: " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+		const std::string str = "Could not acquire lock to set codec negotiation preference on local side for PJSIP account id " + boost::lexical_cast<std::string>(acc_id)+", PJSIP call id " + boost::lexical_cast<std::string>(call_id);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("Could not acquire lock to set codec negotiation preference on local side for PJSIP account id: " << acc_id << ", PJSIP call id: " << call_id);
 	}
 
 	BlabbleAccountPtr acc = manager->FindAcc(acc_id);
@@ -479,9 +571,12 @@ void PjsuaManager::OnCallMediaState(pjsua_call_id call_id)
 	pj_status_t status;
 	if ((status = pjsua_call_get_info(call_id, &info)) == PJ_SUCCESS) 
 	{
-		std::string str = "PjsuaManager::OnCallMediaState called with PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", state: " + boost::lexical_cast<std::string>(info.state);
+		const std::string str = "PjsuaManager::OnCallMediaState called with PJSIP call id " +
+						boost::lexical_cast<std::string>(call_id)+", state: " +
+						boost::lexical_cast<std::string>(info.state) +
+						" (" + std::string(pjsip_inv_state_name(info.state)) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_TRACE("PjsuaManager::OnCallMediaState called with PJSIP call id: " << call_id << ", state: " << info.state);
+
 		BlabbleAccountPtr acc = manager->FindAcc(info.acc_id);
 		if (acc)
 		{
@@ -490,9 +585,8 @@ void PjsuaManager::OnCallMediaState(pjsua_call_id call_id)
 	}
 	else
 	{
-		std::string str = "PjsuaManager::OnCallMediaState failed to call pjsua_call_get_info for PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
+		const std::string str = "PjsuaManager::OnCallMediaState failed to call pjsua_call_get_info for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("PjsuaManager::OnCallMediaState failed to call pjsua_call_get_info for PJSIP call id: " << call_id << ", got status: " << status);
 	}
 
 }
@@ -509,26 +603,33 @@ void PjsuaManager::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	pj_status_t status;
 	if ((status = pjsua_call_get_info(call_id, &info)) == PJ_SUCCESS) 
 	{
-		std::string str = "PjsuaManager::OnCallState called with PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", state: " + boost::lexical_cast<std::string>(info.state);
+		const std::string str = "PjsuaManager::OnCallState called with PJSIP call id " +
+						boost::lexical_cast<std::string>(call_id)+", state: " +
+						boost::lexical_cast<std::string>(info.state) +
+						" (" + std::string(pjsip_inv_state_name(info.state)) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_TRACE("PjsuaManager::OnCallState called with PJSIP call id: " << call_id << ", state: " << info.state);
+
 		BlabbleAccountPtr acc = manager->FindAcc(info.acc_id);
 		if (acc)
 		{
 			acc->OnCallState(call_id, e);
 		}
 
+		// REITEK: !!! CHECK: If this necessary/wanted?
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED)
 		{
+#if 0
+			// Don't hangup the call to avoid overlapping
+
 			//Just make sure we get rid of the call
 			pjsua_call_hangup(call_id, 0, NULL, NULL);
+#endif
 		}
 	}
 	else
 	{
-		std::string str = "PjsuaManager::OnCallState failed to call pjsua_call_get_info for PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
+		const std::string str = "PjsuaManager::OnCallState failed to call pjsua_call_get_info for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("PjsuaManager::OnCallState failed to call pjsua_call_get_info for PJSIP call id: " << call_id << ", got status: " << status);
 	}
 }
 
@@ -545,9 +646,12 @@ void PjsuaManager::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx,
 	pj_status_t status;
 	if ((status = pjsua_call_get_info(call_id, &info)) == PJ_SUCCESS)
 	{
-		std::string str = "PjsuaManager::OnCallTsxState called with PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", state: " + boost::lexical_cast<std::string>(info.state);
+		const std::string str = "PjsuaManager::OnCallTsxState called with PJSIP call id " +
+						boost::lexical_cast<std::string>(call_id) +
+						", state: " + boost::lexical_cast<std::string>(info.state) +
+						" (" + std::string(pjsip_inv_state_name(info.state)) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_TRACE("PjsuaManager::OnCallTsxState called with PJSIP call id: "<< call_id << ", state: " << info.state);
+
 		BlabbleAccountPtr acc = manager->FindAcc(info.acc_id);
 		if (acc)
 		{
@@ -557,15 +661,18 @@ void PjsuaManager::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx,
 		// REITEK: !!! CHECK: If this necessary/wanted?
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED)
 		{
+#if 0
+			// Don't hangup the call to avoid overlapping
+
 			//Just make sure we get rid of the call
 			pjsua_call_hangup(call_id, 0, NULL, NULL);
+#endif
 		}
 	}
 	else
 	{
-		std::string str = "PjsuaManager::OnCallTsxState failed to call pjsua_call_get_info for PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
+		const std::string str = "PjsuaManager::OnCallTsxState failed to call pjsua_call_get_info for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("PjsuaManager::OnCallTsxState failed to call pjsua_call_get_info for PJSIP call id: "<< call_id << ", got status: " << status);
 	}
 }
 
@@ -584,9 +691,8 @@ void PjsuaManager::OnRegState(pjsua_acc_id acc_id)
 	}
 	else
 	{
-		std::string str = "PjsuaManager::OnRegState failed to find account PJSIP account id: " + boost::lexical_cast<std::string>(acc_id);
+		const std::string str = "PjsuaManager::OnRegState failed to find account PJSIP account id " + boost::lexical_cast<std::string>(acc_id);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("PjsuaManager::OnRegState failed to find account PJSIP account id: " << acc_id);
 	}
 }
 
@@ -594,9 +700,9 @@ void PjsuaManager::OnRegState(pjsua_acc_id acc_id)
 //Static
 void PjsuaManager::OnCallTransferStatus(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
 {
-	std::string str = "PjsuaManager::OnCallTransferState called with PJSIP call id: " + boost::lexical_cast<std::string>(call_id) + ", state: " + boost::lexical_cast<std::string>(st_code);
+	const std::string str = "PjsuaManager::OnCallTransferState called with PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ", state: " + boost::lexical_cast<std::string>(st_code);
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_TRACE("PjsuaManager::OnCallTransferState called with PJSIP call id: " << call_id << ", state: " << st_code);
+
 	PjsuaManagerPtr manager = PjsuaManager::instance_.lock();
 
 	if (!manager)
@@ -615,9 +721,8 @@ void PjsuaManager::OnCallTransferStatus(pjsua_call_id call_id, int st_code, cons
 	}
 	else
 	{
-		std::string str = "PjsuaManager::OnCallTransferStatus failed to call pjsua_call_get_info for PJSIP call id: " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
+		const std::string str = "PjsuaManager::OnCallTransferStatus failed to call pjsua_call_get_info for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+", got status: " + boost::lexical_cast<std::string>(status);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("PjsuaManager::OnCallTransferStatus failed to call pjsua_call_get_info for PJSIP call id: " << call_id << ", got status: " << status);
 	}
 }
 #endif

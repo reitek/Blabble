@@ -114,7 +114,7 @@ std::wstring BlabbleLogging::getLogFilename()
 void BlabbleLogging::blabbleLog(int level, const char* data, int len)
 {
 	BlabbleLogging::checkLogSIP();
-	std::string str = BlabbleLogging::createDateTimeString() + " " + boost::lexical_cast<std::string>(data);
+	const std::string str = BlabbleLogging::createDateTimeString() + " " + boost::lexical_cast<std::string>(data);
 	if (BlabbleLogging::logging_started)
 	{
 		std::ofstream fs = BlabbleLogging::createFile(BlabbleLogging::filepathSIP);
@@ -218,7 +218,7 @@ void BlabbleLogging::getLogAD()
 void BlabbleLogging::writeLogAD(std::string data)
 {
 	BlabbleLogging::checkLogAD();
-	std::string str = BlabbleLogging::createDateTimeString() + data;
+	const std::string str = BlabbleLogging::createDateTimeString() + data;
 
 	std::ofstream fs = BlabbleLogging::createFile(BlabbleLogging::filepathAD);
 	fs << str << std::endl;
@@ -627,4 +627,3 @@ std::string BlabbleLogging::createDateTimeString()
 	/* Taglio la frazione al millisecondo */
 	return stream.str().substr(0,25);
 }
-

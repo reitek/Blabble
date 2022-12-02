@@ -42,9 +42,9 @@ if (WIN32)
 		${FB_PLUGIN_INCLUDE_DIRS}
 		${Boost_INCLUDE_DIRS}
 		#${FB_ROOT}\\src\\libs\\log4cplus\\include
-		\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
-		\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
-		\\..\\..\\..\\..\\env\\Win32\\include\\curl
+		..\\..\\..\\..\\env\\Win32\\include\\pjproject
+		..\\..\\..\\..\\env\\Win32\\include\\ziplib
+		..\\..\\..\\..\\env\\Win32\\include\\curl
 	)
 
 	set(FB_PLUGIN_INTERNAL_DEPS 

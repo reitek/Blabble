@@ -131,12 +131,7 @@ public:
 	/*! @Brief Called by BlabbleCall when a call is ended by this side.
 	 *  @sa OnRemoteCallEnd
 	 */
-	void OnCallEnd(const BlabbleCallPtr& call);
-	
-	/*! @Brief Called by BlabbleCall when a call is ended by the other side.
-	 *  @sa OnCallEnd
-	 */
-	void OnRemoteCallEnd(BlabbleCallPtr call, pjsua_call_id call_id, const pjsua_call_info& info);
+	void OnCallEnd(pjsua_call_id call_id, const BlabbleCallPtr& call);
 
 	// REITEK: Disable TLS flag (TLS is handled differently)
 #if 0

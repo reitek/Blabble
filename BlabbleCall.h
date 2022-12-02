@@ -97,7 +97,12 @@ class BlabbleCall : public FB::JSAPIAuto
 		/*! @Brief JavaScript property to return a JavaScript object with the call's status, caller ID, and duration.
 		 */
 		FB::VariantMap status();
-		
+
+		/**
+		*	ENGHOUSE: Get call statistics
+		*/
+		const std::string statistics();
+
 		/*! @Brief JavaScript property that returns true if this call is active (audio is bridged to sound card)
 		 */
 		bool is_active();
@@ -118,9 +123,16 @@ class BlabbleCall : public FB::JSAPIAuto
 		 */
 		void set_on_call_end(const FB::JSObjectPtr& v) { on_call_end_ = v; }
 
+		/**
+		*	ENGHOUSE: Set callback function to be periodically called while the call exists
+		*/
+		void set_on_call_periodic_event(const FB::JSObjectPtr& v) { on_call_periodic_event_ = v; }
+
+#if 0	// !!! REMOVE ME
 		/*! @Brief A write only JavaScript property used to set the callback function for when a call has ended providing the PJSIP statistics.
 		*/
 		void set_on_call_end_statistics(const FB::JSObjectPtr& v) { on_call_end_statistics_ = v; }
+#endif
 
 #if 0	// REITEK: Disabled
 		/*! @Brief A write only JavaScript property used to set the callback function to notify of the status of a transfer.
@@ -179,20 +191,73 @@ class BlabbleCall : public FB::JSAPIAuto
 		 */
 		unsigned int id() const { return id_; }
 
+		/*! @Brief ENGHOUSE: Called to start the in-dialog sending of OPTIONS
+		 */
+		bool StartOptionsKATimer();
+
+		/*! @Brief ENGHOUSE: Called to stop the in-dialog sending of OPTIONS
+		 */
+		bool StopOptionsKATimer(pjsua_call_id call_id);
+
+		/*! @Brief ENGHOUSE: Send an in-dialog OPTIONS
+		 */
+		bool SendOptionsKA();
+
+		/*! @Brief ENGHOUSE: Called to start the periodic event timer
+		 */
+		bool StartPeriodicEventTimer();
+
+		/*! @Brief ENGHOUSE: Called to stop the periodic event timer
+		 */
+		bool StopPeriodicEventTimer(pjsua_call_id call_id);
+
+		/*! @Brief ENGHOUSE: Handle the periodic event timer
+		*/
+		bool OnPeriodicEventTimer();
+
+		/*! @Brief ENGHOUSE: Called to start the timer for the maximum timeout for answering the call
+		 */
+		bool StartAnswerTimer();
+
+		/*! @Brief ENGHOUSE: Called to stop the timer for the maximum timeout for answering the call
+		 */
+		bool StopAnswerTimer(pjsua_call_id call_id);
+
+		/*! @Brief ENGHOUSE: Handle the timer for the maximum timeout for answering the call
+		*/
+		bool OnAnswerTimer();
+
 	private:
 		std::string destination_;
 		unsigned int id_;
 		volatile pjsua_call_id call_id_;
 		pjsua_acc_id acct_id_;
 		bool ringing_;
+		// ENGHOUSE: Flag to know if first ACK or not
+		bool firstconfirmedstate_;
+		// ENGHOUSE: PJSIP timer for sending OPTIONS keep-alive requests during this call
+		pj_timer_entry options_ka_timer_;
+		// ENGHOUSE: OPTIONS keep-alive timeout
+		int optionskatimeout_;
+		// ENGHOUSE: PJSIP timer for calling the periodic event handler callback during this call
+		pj_timer_entry periodic_event_timer_;
+		// ENGHOUSE: Periodic event timeout
+		int periodiceventtimeout_;
+		// ENGHOUSE: PJSIP timer for the maximum timeout for answering the call
+		pj_timer_entry answer_timer_;
+		// ENGHOUSE: Maximum timeout for answering the call
+		int answertimeout_;
 
 		BlabbleAudioManagerPtr audio_manager_;
 		BlabbleAccountWeakPtr parent_;
-  
+
 		FB::JSObjectPtr on_call_connected_;
 		FB::JSObjectPtr on_call_ringing_;
 		FB::JSObjectPtr on_call_end_;
+		FB::JSObjectPtr on_call_periodic_event_;
+#if 0	// !!! REMOVE ME
 		FB::JSObjectPtr on_call_end_statistics_;
+#endif
 #if 0	// REITEK: Disabled
 		FB::JSObjectPtr on_transfer_status_;
 #endif
@@ -210,9 +275,10 @@ class BlabbleCall : public FB::JSAPIAuto
 		static unsigned int id_counter_;
 		static unsigned int GetNextId();
 
-		void CallOnCallEnd();
-		void CallOnCallEndStatus(pjsip_status_code status);
+		void CallOnCallEnd(pjsua_call_id call_id, pjsip_status_code status);
+#if 0	// !!! REMOVE ME
 		void CallOnCallEndStatistics(std::string statistics);
+#endif
 #if 0	// REITEK: Disabled
 		void CallOnTransferStatus(int status);
 #endif
