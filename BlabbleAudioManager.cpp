@@ -322,7 +322,7 @@ void BlabbleAudioManager::StartInRing()
 					if (status != PJ_SUCCESS)
 					{
 						// !!! UGLY (should automatically conform to pjsip formatting)
-						std::string str = " ERROR:                Could not change audio device before ring playback";
+						const std::string str = " ERROR:                Could not change audio device before ring playback";
 						BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 					}
 					else
@@ -338,7 +338,7 @@ void BlabbleAudioManager::StartInRing()
 			else
 			{
 				// !!! UGLY (should automatically conform to pjsip formatting)
-				std::string str = " ERROR:                Could not save current audio device information: unable to change the audio device for ring playback";
+				const std::string str = " ERROR:                Could not save current audio device information: unable to change the audio device for ring playback";
 				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 			}
 		}
@@ -352,14 +352,14 @@ void BlabbleAudioManager::StartInRing()
 				if (status != PJ_SUCCESS)
 				{
 					// !!! UGLY (should automatically conform to pjsip formatting)
-					std::string str = " ERROR:                Could not change audio volume before ring playback";
+					const std::string str = " ERROR:                Could not change audio volume before ring playback";
 					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 				}
 			}
 			else
 			{
 				// !!! UGLY (should automatically conform to pjsip formatting)
-				std::string str = " ERROR:                Could not get current audio volume before ring playback";
+				const std::string str = " ERROR:                Could not get current audio volume before ring playback";
 				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 			}
 		}
@@ -389,7 +389,7 @@ static pj_status_t on_playwav_done(pjmedia_port *port, void *usr_data)
 	else
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:                NULL usr_data passed to on_playwav_done callback function";
+		const std::string str = " ERROR:                NULL usr_data passed to on_playwav_done callback function";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -626,7 +626,12 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 		// Set the EOF callback only if playing with no loop (else it would be automatically stopped)
 		if (!loop)
 		{
-			// !!! TODO: Error checking !!!
+			/**
+			*	!!! TODO: Error checking !!!
+			*
+			*	!!! TODO: pjmedia_wav_player_set_eof_cb is deprecated since PJSIP 2.10,
+			*	pjmedia_wav_player_set_eof_cb2 should be used, but the usage semantics differ
+			*/
 			pjmedia_wav_player_set_eof_cb(port, (void *)this, &on_playwav_done);
 		}
 	}
@@ -649,7 +654,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 				if (status != PJ_SUCCESS)
 				{
 					// !!! UGLY (should automatically conform to pjsip formatting)
-					std::string str = " ERROR:                Could not change audio device before wav playback";
+					const std::string str = " ERROR:                Could not change audio device before wav playback";
 					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 				}
 				else
@@ -665,7 +670,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 		else
 		{
 			// !!! UGLY (should automatically conform to pjsip formatting)
-			std::string str = " ERROR:                Could not save current audio device information: unable to change the audio device for wav playback";
+			const std::string str = " ERROR:                Could not save current audio device information: unable to change the audio device for wav playback";
 			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 		}
 	}
@@ -686,7 +691,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 			if (status != PJ_SUCCESS)
 			{
 				// !!! UGLY (should automatically conform to pjsip formatting)
-				std::string str = " ERROR:                Could not change audio volume before wav playback";
+				const std::string str = " ERROR:                Could not change audio volume before wav playback";
 				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 			}
 			else
@@ -701,7 +706,7 @@ bool BlabbleAudioManager::PlayWav(FB::VariantMap playWavParams)
 		else
 		{
 			// !!! UGLY (should automatically conform to pjsip formatting)
-			std::string str = " ERROR:                Could not get current audio volume before wav playback";
+			const std::string str = " ERROR:                Could not get current audio volume before wav playback";
 			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 		}
 	}
@@ -929,7 +934,7 @@ bool BlabbleAudioManager::SaveAudioDevice()
 	if (old_playback_dev_ > -1)
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Current audio device already saved";
+		const std::string str = " ERROR:            Current audio device already saved";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -941,7 +946,7 @@ bool BlabbleAudioManager::SaveAudioDevice()
 	if (status != PJ_SUCCESS)
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Could not get current audio device";
+		const std::string str = " ERROR:            Could not get current audio device";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -952,7 +957,7 @@ bool BlabbleAudioManager::SaveAudioDevice()
 
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " INFO:                 Saved current audio device (" + boost::lexical_cast<std::string>(old_playback_dev_) + ")";
+		const std::string str = " INFO:                 Saved current audio device (" + boost::lexical_cast<std::string>(old_playback_dev_) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -966,7 +971,7 @@ bool BlabbleAudioManager::SaveAudioVolume()
 	if (old_playback_volume_.get())
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Current audio volume already saved";
+		const std::string str = " ERROR:            Current audio volume already saved";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -977,7 +982,7 @@ bool BlabbleAudioManager::SaveAudioVolume()
 	if (status != PJ_SUCCESS)
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Could not get current audio volume";
+		const std::string str = " ERROR:            Could not get current audio volume";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -987,7 +992,7 @@ bool BlabbleAudioManager::SaveAudioVolume()
 
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " INFO:                 Saved current audio volume (" + boost::lexical_cast<std::string>(info.tx_level_adj) + ")";
+		const std::string str = " INFO:                 Saved current audio volume (" + boost::lexical_cast<std::string>(info.tx_level_adj) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -1001,7 +1006,7 @@ bool BlabbleAudioManager::RestoreAudioDevice()
 	if (old_playback_dev_ == -1)
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Current audio device not saved";
+		const std::string str = " ERROR:            Current audio device not saved";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -1021,7 +1026,7 @@ bool BlabbleAudioManager::RestoreAudioDevice()
 		if (status != PJ_SUCCESS)
 		{
 			// !!! UGLY (should automatically conform to pjsip formatting)
-			std::string str = " ERROR:            Could not restore the saved audio device";
+			const std::string str = " ERROR:            Could not restore the saved audio device";
 			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 			return false;
@@ -1030,7 +1035,7 @@ bool BlabbleAudioManager::RestoreAudioDevice()
 
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " INFO:                 Restored the saved audio device (" + boost::lexical_cast<std::string>(old_playback_dev_)+")";
+		const std::string str = " INFO:                 Restored the saved audio device (" + boost::lexical_cast<std::string>(old_playback_dev_)+")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -1046,7 +1051,7 @@ bool BlabbleAudioManager::RestoreAudioVolume()
 	if (!old_playback_volume_.get())
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Current audio volume not saved";
+		const std::string str = " ERROR:            Current audio volume not saved";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -1064,7 +1069,7 @@ bool BlabbleAudioManager::RestoreAudioVolume()
 	if (status != PJ_SUCCESS)
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " ERROR:            Could not restore the saved audio volume";
+		const std::string str = " ERROR:            Could not restore the saved audio volume";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		return false;
@@ -1074,7 +1079,7 @@ bool BlabbleAudioManager::RestoreAudioVolume()
 
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
-		std::string str = " INFO:                 Restored the saved audio volume (" + boost::lexical_cast<std::string>(oldPlaybackVolume)+")";
+		const std::string str = " INFO:                 Restored the saved audio volume (" + boost::lexical_cast<std::string>(oldPlaybackVolume)+")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 

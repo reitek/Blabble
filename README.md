@@ -17,10 +17,10 @@ This version of PluginSIP is only intended for execution on browsers that use th
 Building (Windows 32 bits):
 
 Required dependencies and tested versions for building the project, as of 2020/05/08, are the following:
-- Visual Studio 2017 (only paid versions are known to work)
+- Visual Studio Professional 2017
 - CMake 3.12 (either standalone or installed as a component of Visual Studio 2017)
 - FireBreath 1.0 (www.firebreath.org)
-- PJSIP 2.9
+- PJSIP 2.12.1
 - bcg729-1.0.4 (indirect dependency included by PJSIP for G.729 codec support)
 - curl 7.55.1 in order to upload log files
 - ziplib bitbucket.org/wbenny/ziplib/wiki/Home (latest tested version is git commit 176e4b6 on 2018/07/16) in order to upload log files

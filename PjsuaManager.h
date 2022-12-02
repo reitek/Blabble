@@ -43,6 +43,15 @@ typedef std::map<int, BlabbleAccountPtr> BlabbleAccountMap;
 class PjsuaManager : public boost::enable_shared_from_this<PjsuaManager>
 {
 public:
+	// ENGHOUSE: OPTIONS keep-alive timeout
+	static int optionskatimeout_;
+
+	// ENGHOUSE: Periodic event timeout
+	static int periodiceventtimeout_;
+
+	// ENGHOUSE: Answer timeout
+	static int answertimeout_;
+
 	// REITEK: Get/parse parameters passed to the plugin upon manager creation
 
 	static PjsuaManagerPtr GetManager(Blabble& pluginCore);

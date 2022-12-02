@@ -252,9 +252,10 @@ void BlabbleAccount::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	} 
 	else
 	{
-		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id) +", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		const std::string str = "Received call state change event for unknown PJSIP call id " +
+								boost::lexical_cast<std::string>(call_id) +
+								", on PJSIP account id " + boost::lexical_cast<std::string>(id_);
 		BlabbleLogging::blabbleLog(0,str.c_str(),0);
-		//BLABBLE_LOG_DEBUG("Received call state change event for unknown PJSIP call id: " << call_id << ", on PJSIP account id: " << id_);
 	}
 }
 
@@ -266,9 +267,8 @@ bool BlabbleAccount::OnCallTransferStatus(pjsua_call_id call_id, int status)
 	{
 		return call->OnCallTransferStatus(status);
 	}
-	std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+	const std::string str = "Received call state change event for unknown PJSIP call id " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id " + boost::lexical_cast<std::string>(id_);
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_DEBUG("Received call transfer status for unknown PJSIP call id: " << call_id << ", on PJSIP account id: " << id_);
 
 	//Stop getting notifications since we don't even have this call
 	return true;
@@ -284,9 +284,10 @@ void BlabbleAccount::OnCallMediaState(pjsua_call_id call_id)
 	}
 	else
 	{
-		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		const std::string str = "Received call state change event for unknown PJSIP call id " +
+								boost::lexical_cast<std::string>(call_id) +
+								", on PJSIP account id " + boost::lexical_cast<std::string>(id_);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_DEBUG("Received call media state change event for unknown PJSIP call id: "<< call_id << ", on PJSIP account id: " << id_);
 	}
 }
 
@@ -300,9 +301,10 @@ void BlabbleAccount::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *ts
 	}
 	else
 	{
-		std::string str = "Received call state change event for unknown PJSIP call id : " + boost::lexical_cast<std::string>(call_id)+", on PJSIP account id: " + boost::lexical_cast<std::string>(id_);
+		const std::string str = "Received call state change event for unknown PJSIP call id " +
+								boost::lexical_cast<std::string>(call_id) +
+								", on PJSIP account id " + boost::lexical_cast<std::string>(id_);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_DEBUG("Received transaction state change event for unknown PJSIP call id: "<< call_id << ", on PJSIP account id: " << id_);
 	}
 }
 
@@ -321,8 +323,11 @@ BlabbleCallPtr BlabbleAccount::FindCall(pjsua_call_id call_id)
 	return BlabbleCallPtr();
 }
 
-void BlabbleAccount::OnCallEnd(const BlabbleCallPtr& call)
+void BlabbleAccount::OnCallEnd(pjsua_call_id call_id, const BlabbleCallPtr& call)
 {
+	const std::string str = "OnCallEnd for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ", global id " + boost::lexical_cast<std::string>(call->id());
+	BlabbleLogging::blabbleLog(0,str.c_str(),0);
+
 	if (call->id() == ringing_call_)
 	{
 		ringing_call_ = 0;

@@ -24,6 +24,40 @@ Copyright 2012 Andrew Ofisher
 #endif
 
 
+/* OPTIONS keep-alive timer callback */
+static void options_ka_timer(pj_timer_heap_t *th, pj_timer_entry *e)
+{
+	const std::string str = "OPTIONS keep-alive timer callback (user_data: " + boost::lexical_cast<std::string>(e->user_data) + ")";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	BlabbleCall * call = (BlabbleCall *) e->user_data;
+
+	call->SendOptionsKA();
+}
+
+/* Periodic event timer callback */
+static void periodic_event_timer(pj_timer_heap_t *th, pj_timer_entry *e)
+{
+	const std::string str = "Periodic event timer callback (user_data: " + boost::lexical_cast<std::string>(e->user_data) + ")";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	BlabbleCall * call = (BlabbleCall *) e->user_data;
+
+	call->OnPeriodicEventTimer();
+}
+
+/* answer timer callback */
+static void answer_timer(pj_timer_heap_t *th, pj_timer_entry *e)
+{
+	const std::string str = "Answer timer callback (user_data: " + boost::lexical_cast<std::string>(e->user_data) + ")";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	BlabbleCall * call = (BlabbleCall *) e->user_data;
+
+	call->OnAnswerTimer();
+}
+
+
 /*! @Brief Static call counter to keep track of calls.
  */
 unsigned int BlabbleCall::id_counter_ = 0;
@@ -33,13 +67,19 @@ unsigned int BlabbleCall::GetNextId()
 }
 
 BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
-	: call_id_(INVALID_CALL), ringing_(false)
+	: call_id_(INVALID_CALL), ringing_(false), firstconfirmedstate_(true)
 {
 	if (parent_account) 
 	{
 		acct_id_ = parent_account->id();
 		audio_manager_ = parent_account->GetManager()->audio_manager();
 		parent_ = BlabbleAccountWeakPtr(parent_account);
+		// ENGHOUSE: OPTIONS keep-alive timeout
+		optionskatimeout_ = parent_account->GetManager()->optionskatimeout_;
+		// ENGHOUSE: Periodic event timeout
+		periodiceventtimeout_ = parent_account->GetManager()->periodiceventtimeout_;
+		// ENGHOUSE: Maximum timeout for answering the call
+		answertimeout_ = parent_account->GetManager()->answertimeout_;
 	}
 	else 
 	{
@@ -47,9 +87,20 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 	}
 	
 	id_ = BlabbleCall::GetNextId();
-	std::string str = "New call created. Global id: " + boost::lexical_cast<std::string>(id_);
-	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_DEBUG("New call created. Global id: " << id_);
+
+	{
+		const std::string str = "Created new call with global id " + boost::lexical_cast<std::string>(id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	pj_timer_entry_init(&options_ka_timer_, 0, (void *)this, &options_ka_timer);
+	pj_timer_entry_init(&periodic_event_timer_, 1, (void *)this, &periodic_event_timer);
+	pj_timer_entry_init(&answer_timer_, 2, (void *)this, &answer_timer);
+
+	{
+		const std::string str = "Set OPTIONS keep-alive user_data: " + boost::lexical_cast<std::string>(this);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
 
 	registerMethod("answer", make_method(this, &BlabbleCall::Answer));
 	registerMethod("hangup", make_method(this, &BlabbleCall::LocalEnd));
@@ -62,14 +113,18 @@ BlabbleCall::BlabbleCall(const BlabbleAccountPtr& parent_account)
 	registerMethod("transferReplace", make_method(this, &BlabbleCall::TransferReplace));
 	registerMethod("transfer", make_method(this, &BlabbleCall::Transfer));
 #endif
-	
+
 	registerProperty("callerId", make_property(this, &BlabbleCall::caller_id));
 	registerProperty("isActive", make_property(this, &BlabbleCall::is_active));
 	registerProperty("status", make_property(this, &BlabbleCall::status));
+	registerProperty("statistics", make_property(this, &BlabbleCall::statistics));
 
 	registerProperty("onCallConnected", make_write_only_property(this, &BlabbleCall::set_on_call_connected));
 	registerProperty("onCallEnd", make_write_only_property(this, &BlabbleCall::set_on_call_end));
+	registerProperty("onCallPeriodicEvent", make_write_only_property(this, &BlabbleCall::set_on_call_periodic_event));
+#if 0	// !!! REMOVE ME
 	registerProperty("onCallEndStatistics", make_write_only_property(this, &BlabbleCall::set_on_call_end_statistics));
+#endif
 }
 
 void BlabbleCall::StopRinging()
@@ -109,6 +164,12 @@ void BlabbleCall::LocalEnd()
 		return;
 	}
 
+	StopOptionsKATimer(old_id);
+
+	StopPeriodicEventTimer(old_id);
+
+	StopAnswerTimer(old_id);
+
 	StopRinging();
 
 	pjsua_call_info info;
@@ -121,32 +182,54 @@ void BlabbleCall::LocalEnd()
 	}
 
 	pjsua_call_hangup(old_id, 0, NULL, NULL);
-	
+
 	if (on_call_end_)
 	{
+		const std::string str = "Scheduling execution of onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(old_id);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 		BlabbleCallPtr call = get_shared();
-		on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEnd, call));
+
+		/**
+		*	Use a status code equal to 0
+		*/
+		on_call_end_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEnd, call, old_id, (pjsip_status_code) 0));
+	} else {
+		/**
+		*	No onCallEnd callback: the call can be removed immediately
+		*/
+
+		BlabbleAccountPtr p = parent_.lock();
+		if (p)
+			p->OnCallEnd(old_id, get_shared());
+	}
+}
+
+void BlabbleCall::CallOnCallEnd(pjsua_call_id call_id, pjsip_status_code status)
+{
+	{
+		const std::string str = "Executing onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(call_id);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
+
+	{
+		const std::string str = "Executed onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(call_id);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
 	BlabbleAccountPtr p = parent_.lock();
 	if (p)
-		p->OnCallEnd(get_shared());
+		p->OnCallEnd(call_id, get_shared());
 }
 
-void BlabbleCall::CallOnCallEnd()
-{
-	on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared())));
-}
-
-void BlabbleCall::CallOnCallEndStatus(pjsip_status_code status)
-{
-	on_call_end_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(status));
-}
-
+#if 0	// !!! REMOVE ME
 void BlabbleCall::CallOnCallEndStatistics(std::string statistics)
 {
 	on_call_end_statistics_->Invoke("", FB::variant_list_of(BlabbleCallWeakPtr(get_shared()))(statistics));
 }
+#endif
 
 #if 0	// REITEK: Disabled
 void BlabbleCall::CallOnTransferStatus(int status)
@@ -165,6 +248,12 @@ void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 		return;
 	}
 
+	StopOptionsKATimer(old_id);
+
+	StopPeriodicEventTimer(old_id);
+
+	StopAnswerTimer(old_id);
+
 	StopRinging();
 
 	//Kill the audio
@@ -176,41 +265,28 @@ void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 
 	pjsua_call_hangup(old_id, 0, NULL, NULL);
 
-	if (info.last_status > 400)
+	if (on_call_end_)
 	{
-		std::string callerId;
-		if (info.remote_contact.ptr == NULL)
-		{
-			callerId =std::string(info.remote_info.ptr, info.remote_info.slen);
-		} 
-		else
-		{
-			callerId = std::string(info.remote_contact.ptr, info.remote_contact.slen);
-		}
+		const std::string str = "Scheduling execution of onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(old_id);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
-		if (on_call_end_)
-		{
-			BlabbleCallPtr call = get_shared();
-			on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEndStatus, call, info.last_status));
-		}
+		BlabbleCallPtr call = get_shared();
+		on_call_end_->getHost()->ScheduleOnMainThread(call, std::bind(&BlabbleCall::CallOnCallEnd, call, old_id, info.last_status));
 	} else {
-		if (on_call_end_)
-		{
-			BlabbleCallPtr call = get_shared();
-			on_call_end_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEnd, call));
-		}
-	}
+		/**
+		*	No onCallEnd callback: the call can be removed immediately
+		*/
 
-	BlabbleAccountPtr p = parent_.lock();
-	if (p)
-		p->OnCallEnd(get_shared());
+		BlabbleAccountPtr p = parent_.lock();
+		if (p)
+			p->OnCallEnd(old_id, get_shared());
+	}
 }
 
 BlabbleCall::~BlabbleCall(void)
 {
-	std::string str = "Call Deleted. Global id: " + boost::lexical_cast<std::string>(id_);
+	const std::string str = "Call with global id " + boost::lexical_cast<std::string>(id_) + " deleted";
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_DEBUG("Call Deleted. Global id: " << id_);
 	on_call_end_.reset();
 	LocalEnd();
 }
@@ -226,15 +302,13 @@ bool BlabbleCall::RegisterIncomingCall(pjsua_call_id call_id)
 	{
 		call_id_ = call_id;
 		pjsua_call_set_user_data(call_id, &id_);
-		std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" associated to BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_);
+		const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" associated to call with global id " + boost::lexical_cast<std::string>(id_);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id << " associated to BlabbleCall with Global id " << id_);
 
 		return true;
 	}
-	std::string str = "BlabbleCall::RegisterIncomingCall called on BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_)+" already associated to a PJSIP call, or invalid PJSIP call id specified";
+	const std::string str = "RegisterIncomingCall called on call with global id " + boost::lexical_cast<std::string>(id_)+" already associated to a PJSIP call, or invalid PJSIP call id specified";
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_ERROR("BlabbleCall::RegisterIncomingCall called on BlabbleCall with Global id " << id_ << " already associated to a PJSIP call, or invalid PJSIP call id specified");
 
 	return false;
 }
@@ -247,12 +321,14 @@ bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
 
 	if (call_id_ == INVALID_CALL)
 	{
-		std::string str = "BlabbleCall::HandleIncomingCall called on BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_)+" not associated to a PJSIP call";
+		const std::string str = "HandleIncomingCall called on call with global id " + boost::lexical_cast<std::string>(id_)+" not associated to a PJSIP call";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("BlabbleCall::HandleIncomingCall called on BlabbleCall with Global id " << id_ << " not associated to a PJSIP call");
 
 		return false;
 	}
+
+	// Start the periodic event timer
+	StartPeriodicEventTimer();
 
 	bool mustAnswerCall	= false;
 
@@ -272,9 +348,8 @@ bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
 				const int timeout = atoi(pos);
 				if (timeout == 0)
 				{
-					std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + ": auto answer header found";
+					const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + ": auto answer header found";
 					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-					//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id_ << ": auto answer header found");
 
 					mustAnswerCall = true;
 				}
@@ -309,6 +384,177 @@ bool BlabbleCall::HandleIncomingCall(pjsip_rx_data *rdata)
 
 		StartInRinging();
 	}
+
+	return true;
+}
+
+bool BlabbleCall::StartOptionsKATimer()
+{
+	if (optionskatimeout_ > 0)
+	{
+		const std::string str = "Start " + boost::lexical_cast<std::string>(optionskatimeout_) + "s OPTIONS keep-alive timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pj_time_val delay = { 0 };
+		delay.sec = optionskatimeout_;
+
+		const pj_status_t status = pjsip_endpt_schedule_timer(pjsua_get_pjsip_endpt(), &options_ka_timer_, &delay);
+		if (status != PJ_SUCCESS)
+		{
+			// !!! UGLY (should automatically conform to pjsip formatting)
+			const std::string str = " ERROR:                Could not schedule OPTIONS keep-alive timer";
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool BlabbleCall::StopOptionsKATimer(pjsua_call_id call_id)
+{
+	if (optionskatimeout_ > 0)
+	{
+		const std::string str = "Stop OPTIONS keep-alive timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pjsip_endpt_cancel_timer(pjsua_get_pjsip_endpt(), &options_ka_timer_);
+	}
+
+	return true;
+}
+
+bool BlabbleCall::SendOptionsKA()
+{
+	std::string str = "Send OPTIONS keep-alive PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	const pj_str_t SIP_OPTIONS = pj_str("OPTIONS");
+
+	pj_status_t status = pjsua_call_send_request(call_id_, &SIP_OPTIONS, NULL);
+	if (status != PJ_SUCCESS)
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		str = " ERROR:                Could not send OPTIONS keep-alive";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		return false;
+	}
+
+	return true;
+}
+
+/*! @Brief ENGHOUSE: Called to start the periodic event timer
+*/
+bool BlabbleCall::StartPeriodicEventTimer()
+{
+	if (periodiceventtimeout_ > 0)
+	{
+		const std::string str = "Start " + boost::lexical_cast<std::string>(periodiceventtimeout_) + "s periodic event timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pj_time_val delay = { 0 };
+		delay.sec = periodiceventtimeout_;
+
+		const pj_status_t status = pjsip_endpt_schedule_timer(pjsua_get_pjsip_endpt(), &periodic_event_timer_, &delay);
+		if (status != PJ_SUCCESS)
+		{
+			// !!! UGLY (should automatically conform to pjsip formatting)
+			const std::string str = " ERROR:                Could not schedule periodic event timer";
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/*! @Brief ENGHOUSE: Called to stop the periodic event timer
+	*/
+bool BlabbleCall::StopPeriodicEventTimer(pjsua_call_id call_id)
+{
+	if (periodiceventtimeout_ > 0)
+	{
+		const std::string str = "Stop periodic event timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pjsip_endpt_cancel_timer(pjsua_get_pjsip_endpt(), &periodic_event_timer_);
+	}
+
+	return true;
+}
+
+/*! @Brief ENGHOUSE: Handle the periodic event timer
+*/
+bool BlabbleCall::OnPeriodicEventTimer()
+{
+	const std::string str = "Periodic event timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	if (on_call_periodic_event_)
+	{
+		const std::string str = "Calling callback function for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		on_call_periodic_event_->InvokeAsync("", { BlabbleCallWeakPtr(get_shared()) });
+	}
+	else
+	{
+		const std::string str = "Callback function not set for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	// Restart the periodic event timer
+	StartPeriodicEventTimer();
+
+	return true;
+}
+
+bool BlabbleCall::StartAnswerTimer()
+{
+	if (answertimeout_ > 0)
+	{
+		const std::string str = "Start " + boost::lexical_cast<std::string>(answertimeout_) + "s answer timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pj_time_val delay = { 0 };
+		delay.sec = answertimeout_;
+
+		const pj_status_t status = pjsip_endpt_schedule_timer(pjsua_get_pjsip_endpt(), &answer_timer_, &delay);
+		if (status != PJ_SUCCESS)
+		{
+			// !!! UGLY (should automatically conform to pjsip formatting)
+			const std::string str = " ERROR:                Could not schedule answer timer";
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool BlabbleCall::StopAnswerTimer(pjsua_call_id call_id)
+{
+	if (answertimeout_ > 0)
+	{
+		const std::string str = "Stop answer timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " (user_data: " + boost::lexical_cast<std::string>(this) + ")";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		pjsip_endpt_cancel_timer(pjsua_get_pjsip_endpt(), &answer_timer_);
+	}
+
+	return true;
+}
+
+bool BlabbleCall::OnAnswerTimer()
+{
+	const std::string str = "Answer timer for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	LocalEnd();
 
 	return true;
 }
@@ -360,6 +606,11 @@ pj_status_t BlabbleCall::MakeCall(const std::string& dest, const std::string& id
 
 bool BlabbleCall::Answer()
 {
+	{
+		const std::string str = "answer JS method called for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
 	BlabbleAccountPtr p = CheckAndGetParent();
 	if (!p)
 		return false;
@@ -372,9 +623,8 @@ bool BlabbleCall::Answer()
 
 	StopRinging();
 
-	std::string str = "Answering PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+" associated to BlabbleCall with Global id " + boost::lexical_cast<std::string>(id_);
+	const std::string str = "Answering PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+" associated to call with global id " + boost::lexical_cast<std::string>(id_);
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_DEBUG("Answering PJSIP call id " << call_id_ << " associated to BlabbleCall with Global id " << id_);
 
 	pj_status_t status = pjsua_call_answer(call_id_, 200, NULL, NULL);
 
@@ -438,7 +688,7 @@ bool BlabbleCall::SendDTMF(const std::string& dtmf)
 
 	if (invalid_digits.length() > 0)
 	{
-		std::string str = "WARNING: Discarded characters not valid for SendDTMF: " + invalid_digits;
+		const std::string str = "WARNING: Discarded characters not valid for SendDTMF: " + invalid_digits;
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -592,6 +842,25 @@ FB::VariantMap BlabbleCall::status()
 	return map;
 }
 
+const std::string BlabbleCall::statistics()
+{
+	const std::string str = "statistics JS method called for PJSIP call id " + boost::lexical_cast<std::string>(call_id_);
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+	if (call_id_ == INVALID_CALL)
+	{
+		return "Invalid PJSIP call";
+	}
+
+	char stats_buf[STATS_BUF_SIZE];
+	memset(stats_buf, 0, STATS_BUF_SIZE);
+
+	pjsua_call_dump(call_id_, PJ_TRUE, stats_buf, STATS_BUF_SIZE, "  ");
+	stats_buf[STATS_BUF_SIZE - 1] = '\0';
+
+	return stats_buf;
+}
+
 void BlabbleCall::OnCallMediaState()
 {
 	if (call_id_ == INVALID_CALL)
@@ -600,15 +869,14 @@ void BlabbleCall::OnCallMediaState()
 	pjsua_call_info info;
 	pj_status_t status;
 	if ((status = pjsua_call_get_info(call_id_, &info)) != PJ_SUCCESS) {
-		std::string str = "Unable to get call info. PJSIP call id: " + boost::lexical_cast<std::string>(call_id_) + ", global id: " + boost::lexical_cast<std::string>(id_)+", pjsua_call_get_info returned " + boost::lexical_cast<std::string>(status);
+		const std::string str = "Unable to get call info. PJSIP call id " + boost::lexical_cast<std::string>(call_id_) + ", global id " + boost::lexical_cast<std::string>(id_)+", pjsua_call_get_info returned " + boost::lexical_cast<std::string>(status);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_ERROR("Unable to get call info. PJSIP call id: " << call_id_ << ", global id: " << id_ << ", pjsua_call_get_info returned " << status);
+
 		StopRinging();
 		return;
 	}
-	std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+": media state: " + boost::lexical_cast<std::string>(info.media_status);
+	const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id_)+": media state: " + boost::lexical_cast<std::string>(info.media_status);
 	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-	//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id_ << ": media state: " << info.media_status);
 
 	if (info.media_status == PJSUA_CALL_MEDIA_ACTIVE) 
 	{
@@ -625,15 +893,22 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 	pjsua_call_info info;
 	if (pjsua_call_get_info(call_id, &info) == PJ_SUCCESS)
 	{
-		std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ": call state: " + boost::lexical_cast<std::string>(info.state);
+		const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id) +
+						": call state: " + boost::lexical_cast<std::string>(info.state) +
+						" (" + std::string(pjsip_inv_state_name(info.state)) + ")";
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-		//BLABBLE_LOG_DEBUG("PJSIP call id " << call_id << ": call state: " << info.state);
 
 		if (info.state == PJSIP_INV_STATE_DISCONNECTED) 
 		{
+#if 0	// !!! REMOVE ME
+			/**
+			*	ENGHOUSE: !!! CHECK: This is not reliable anymore, because it is made after media is already deinitialised;
+			*	anyway, pjsip automatically dumps statistics before that happens
+			*/
+
 			// REITEK: Dump call statistics
 
-			std::string dbgstr = "Dumping statistics for PJSIP call id: " + boost::lexical_cast<std::string>(call_id);
+			const std::string dbgstr = "Dumping statistics for PJSIP call id " + boost::lexical_cast<std::string>(call_id);
 			BlabbleLogging::blabbleLog(0, dbgstr.c_str(), 0);
 
 			char stats_buf[STATS_BUF_SIZE];
@@ -649,6 +924,7 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 				BlabbleCallPtr call = get_shared();
 				on_call_end_statistics_->getHost()->ScheduleOnMainThread(call, boost::bind(&BlabbleCall::CallOnCallEndStatistics, call, stats_buf));
 			}
+#endif
 
 			RemoteEnd(info);
 		}
@@ -661,6 +937,16 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 			if (p)
 				p->OnCallRingChange(get_shared(), info);
 		}
+		else if (info.state == PJSIP_INV_STATE_EARLY)
+		{
+			// ENGHOUSE: Start the answer timer
+			StartAnswerTimer();
+		}
+		else if (info.state == PJSIP_INV_STATE_CONNECTING)
+		{
+			// ENGHOUSE: Stop the answer timer
+			StopAnswerTimer(call_id_);
+		}
 		else if (info.state == PJSIP_INV_STATE_CONFIRMED)
 		{
 			if (on_call_connected_)
@@ -669,6 +955,20 @@ void BlabbleCall::OnCallState(pjsua_call_id call_id, pjsip_event *e)
 			BlabbleAccountPtr p = parent_.lock();
 			if (p)
 				p->OnCallRingChange(get_shared(), info);
+
+			// ENGHOUSE: If this is the first ACK, schedule the OPTIONS keep-alive timer
+			if (firstconfirmedstate_)
+			{
+				firstconfirmedstate_ = false;
+
+				const std::string str = "PJSIP call id " + boost::lexical_cast<std::string>(call_id) + ": first ACK";
+				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+				StartOptionsKATimer();
+			}
+
+			// ENGHOUSE: Stop the answer timer
+			StopAnswerTimer(call_id_);
 		}
 	}
 }
@@ -682,11 +982,11 @@ void BlabbleCall::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, 
 		if (pjsip_method_cmp(&tsx->method, &pjsip_options_method) == 0)
 		{
 			/*
-			* Handle OPTIONS method.
+			* Handle incoming OPTIONS request
 			*/
 			if (tsx->role == PJSIP_ROLE_UAS && tsx->state == PJSIP_TSX_STATE_TRYING)
 			{
-				/* Answer incoming OPTIONS with 200/OK */
+				/* Answer incoming OPTIONS request with 200 OK */
 				pjsip_rx_data *rdata;
 				pjsip_tx_data *tdata;
 				pj_status_t status;
@@ -701,26 +1001,63 @@ void BlabbleCall::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, 
 
 				if (status == PJ_SUCCESS)
 				{
-					std::string str = "OPTIONS for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " answered";
+					const std::string str = "Incoming OPTIONS keep-alive for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " answered";
 					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-					//BLABBLE_LOG_DEBUG("OPTIONS for PJSIP call id " << call_id << " answered");
 				}
 				else
 				{
-					std::string str = "OPTIONS for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " not answered";
+					// !!! UGLY (should automatically conform to pjsip formatting)
+					const std::string str = " ERROR:                Incoming OPTIONS keep-alive for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " not answered";
 					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-					//BLABBLE_LOG_DEBUG("OPTIONS for PJSIP call id " << call_id << " not answered");
+				}
+			}
+			else if ((tsx->role == PJSIP_ROLE_UAC) && (tsx->state == PJSIP_TSX_STATE_COMPLETED))
+			{
+				// Final response for sent OPTIONS keep-alive request
+
+				const std::string str = "Final response for sent OPTIONS keep-alive request for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " received";
+				BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+				pjsip_msg *msg = e->body.tsx_state.src.rdata->msg_info.msg;
+				if (msg->type == PJSIP_RESPONSE_MSG)
+				{
+					if (msg->line.status.code == PJSIP_SC_OK)
+					{
+						const std::string str = "Final response for sent OPTIONS keep-alive request for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " status code: 200";
+						BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+						// Restart the OPTIONS keep-alive timer
+						StartOptionsKATimer();
+					}
+					else
+					{
+						// !!! UGLY (should automatically conform to pjsip formatting)
+						const std::string str = " ERROR:                Final response for sent OPTIONS keep-alive request for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " status code: " + boost::lexical_cast<std::string>(msg->line.status.code);
+						BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+						// Must hangup the call
+
+						LocalEnd();
+					}
+				}
+				else
+				{
+					// !!! UGLY (should automatically conform to pjsip formatting)
+					const std::string str = " ERROR:                Message is not a SIP response !!!???";
+					BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 				}
 			}
 		}
 		else if (pjsip_method_cmp(&tsx->method, &pjsip_notify_method) == 0)
 		{
 			/*
-			* Handle NOTIFY method.
+			* Handle incoming NOTIFY request
 			*/
 			if (tsx->role == PJSIP_ROLE_UAS && tsx->state == PJSIP_TSX_STATE_TRYING)
 			{
-				/* Answer incoming NOTIFY with 200/OK if they contains the Event: talk */
+				// !!! FIXME: The incoming NOTIFY request must always be answered
+
+				/* Answer incoming NOTIFY request with 200 OK if it contains the Event: talk */
 				pjsip_rx_data *rdata;
 				pjsip_tx_data *tdata;
 				pj_status_t status;
@@ -744,15 +1081,14 @@ void BlabbleCall::OnCallTsxState(pjsua_call_id call_id, pjsip_transaction *tsx, 
 
 						if (status == PJ_SUCCESS)
 						{
-							std::string str = "NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" answered";
+							const std::string str = "Incoming NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" answered";
 							BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-							//BLABBLE_LOG_DEBUG("NOTIFY (Event:Talk) for PJSIP call id " << call_id << " answered");
 						}
 						else
 						{
-							std::string str = "NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id)+" not answered";
+							// !!! UGLY (should automatically conform to pjsip formatting)
+							const std::string str = " ERROR:                Incoming NOTIFY (Event:Talk) for PJSIP call id " + boost::lexical_cast<std::string>(call_id) + " not answered";
 							BlabbleLogging::blabbleLog(0, str.c_str(), 0);
-							//BLABBLE_LOG_ERROR("NOTIFY (Event:Talk) for PJSIP call id " << call_id << " not answered");
 						}
 
 						Answer();

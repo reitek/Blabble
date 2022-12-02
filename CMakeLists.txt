@@ -20,9 +20,9 @@ file (GLOB GENERAL RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
 if (WIN32)
 INCLUDE_DIRECTORIES(
 	${PLUGIN_INCLUDE_DIRS}
-	\\..\\..\\..\\..\\env\\Win32\\include\\pjproject
-	\\..\\..\\..\\..\\env\\Win32\\include\\ziplib
-	\\..\\..\\..\\..\\env\\Win32\\include\\curl
+	..\\..\\..\\..\\env\\Win32\\include\\pjproject
+	..\\..\\..\\..\\env\\Win32\\include\\ziplib
+	..\\..\\..\\..\\env\\Win32\\include\\curl
 )
 
 SET(PLUGIN_INTERNAL_DEPS 
