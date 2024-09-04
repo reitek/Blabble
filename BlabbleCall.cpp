@@ -157,10 +157,19 @@ void BlabbleCall::StartOutRinging()
 //Ended by us
 void BlabbleCall::LocalEnd()
 {
+	std::string str = "DEBUG:                 +++BlabbleCall::LocalEnd(global id " + boost::lexical_cast<std::string>(id_) + ")+++";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 	pjsua_call_id old_id = INTERLOCKED_EXCHANGE((volatile long *)&call_id_, (long)INVALID_CALL);
 	if (old_id == INVALID_CALL || 
 		old_id < 0 || old_id >= (long)pjsua_call_get_max_count())
 	{
+		str = "DEBUG:                 old_id not valid: ignored";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		str = "DEBUG:                 ---BlabbleCall::LocalEnd(global id " + boost::lexical_cast<std::string>(id_) + ")---";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 		return;
 	}
 
@@ -185,7 +194,7 @@ void BlabbleCall::LocalEnd()
 
 	if (on_call_end_)
 	{
-		const std::string str = "Scheduling execution of onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(old_id);
+		str = "Scheduling execution of onCallEnd handler for PJSIP call id " + boost::lexical_cast<std::string>(old_id);
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 
 		BlabbleCallPtr call = get_shared();
@@ -203,6 +212,9 @@ void BlabbleCall::LocalEnd()
 		if (p)
 			p->OnCallEnd(old_id, get_shared());
 	}
+
+	str = "DEBUG:                 ---BlabbleCall::LocalEnd(global id " + boost::lexical_cast<std::string>(id_) + ")---";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 }
 
 void BlabbleCall::CallOnCallEnd(pjsua_call_id call_id, pjsip_status_code status)
@@ -241,10 +253,19 @@ void BlabbleCall::CallOnTransferStatus(int status)
 //Ended by remote, could be becuase of an error
 void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 {
+	std::string str = "DEBUG:                 +++BlabbleCall::RemoteEnd(global id " + boost::lexical_cast<std::string>(id_) + ")+++";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 	pjsua_call_id old_id = INTERLOCKED_EXCHANGE((volatile long *)&call_id_, (long)INVALID_CALL);
 	if (old_id == INVALID_CALL || 
 		old_id < 0 || old_id >= (long)pjsua_call_get_max_count())
 	{
+		str = "DEBUG:                 old_id not valid: ignored";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+		str = "DEBUG:                 ---BlabbleCall::RemoteEnd(global id " + boost::lexical_cast<std::string>(id_) + ")---";
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 		return;
 	}
 
@@ -281,6 +302,9 @@ void BlabbleCall::RemoteEnd(const pjsua_call_info &info)
 		if (p)
 			p->OnCallEnd(old_id, get_shared());
 	}
+
+	str = "DEBUG:                 ---BlabbleCall::RemoteEnd(global id " + boost::lexical_cast<std::string>(id_) + ")---";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 }
 
 BlabbleCall::~BlabbleCall(void)

@@ -78,12 +78,19 @@ BlabbleAudioManager::BlabbleAudioManager(Blabble& pluginCore) :
 
 	std::string path;
 
+	/**
+	*	!!! NOTE: Using XP_WIN/XP_UNIX defines could be avoided
+	*
+	*	(See: boost::filesystem::path::preferred_separator)
+	*/
+
 #if defined(XP_WIN)
 	std::string appdata = getenv("ALLUSERSPROFILE");
 	path = appdata + "\\Mozilla\\Plugins";
-#elif defined(XP_LINUX)
-	std::string appdata = getenv("HOME");
-	path = appdata + "/Reitek/Contact/BrowserPlugin";
+#elif defined(XP_UNIX)
+	//std::string appdata = getenv("HOME");
+	//path = appdata + "/Reitek/Contact/BrowserPlugin";
+	path = "/usr/share/sounds/reitek-pluginsip";
 #endif
 
 	wav_path_ = path;
@@ -94,9 +101,15 @@ BlabbleAudioManager::BlabbleAudioManager(Blabble& pluginCore) :
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
+	/**
+	*	!!! NOTE: Using XP_WIN/XP_UNIX defines could be avoided
+	*
+	*	(See: boost::filesystem::path::preferred_separator)
+	*/
+
 #if defined(XP_WIN)
 	default_ring_file_ = wav_path_ + "\\ringtone.wav";
-#elif defined(XP_LINUX)
+#elif defined(XP_UNIX)
 	default_ring_file_ = wav_path_ + "/ringtone.wav";
 #endif
 
