@@ -24,6 +24,15 @@ Copyright 2012 Andrew Ofisher
 #include <stdio.h>
 #include <boost/optional.hpp>
 
+#define CURL_STATICLIB
+
+#ifdef WIN32
+#include "curl.h"
+#else
+#include <curl/curl.h>
+#endif
+
+
 #define DEFAULT_OPTIONS_KEEP_ALIVE_DELAY_SEC	60
 #define DEFAULT_PERIODIC_EVENT_TIMEOUT_SEC		0
 #define MIN_PERIODIC_EVENT_TIMEOUT_SEC			10
@@ -65,17 +74,34 @@ PjsuaManager::PjsuaManager(Blabble& pluginCore)
 
 	// REITEK: Get/parse parameters passed to the plugin upon manager creation
 
-	boost::optional<std::string> logging, ice, ecalgo, optionskatimeout, periodiceventtimeout, answertimeout, loglevelparam;
+	boost::optional<std::string> logging, loggingasyncparam, ice, ecalgo, optionskatimeout, periodiceventtimeout, answertimeout, loglevelparam;
 	bool enableIce = false;
+
+	bool loggingAsync = true;
 
 	if ((logging = pluginCore.getParam("logging")) && *logging == "true")
 	{
-		BlabbleLogging::initLogging();
+
+		if ((loggingasyncparam = pluginCore.getParam("loggingasync")) && *loggingasyncparam != "true")
+		{
+			/**
+			*	Be able to disable loggingasync
+			*/
+			loggingAsync = false;
+		}
+
+		BlabbleLogging::init(loggingAsync);
 	}
 
 	{
 		// !!! UGLY (should automatically conform to pjsip formatting)
 		const std::string str = " INFO:                 " + std::string(FBSTRING_PluginName) + std::string(" version ") + std::string(FBSTRING_PLUGIN_VERSION);
+		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+	}
+
+	{
+		// !!! UGLY (should automatically conform to pjsip formatting)
+		const std::string str = " INFO:                 " + std::string("async logging ") + (loggingAsync ? "enabled" : "disabled");
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
 
@@ -428,6 +454,13 @@ PjsuaManager::~PjsuaManager()
 		audio_manager_.reset();
 
 	pjsua_destroy();
+
+	BlabbleLogging::deinit();
+
+	/**
+	*	Cleanup libcurl
+	*/
+	curl_global_cleanup();
 }
 
 void PjsuaManager::AddAccount(const BlabbleAccountPtr &account)

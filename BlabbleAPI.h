@@ -81,9 +81,11 @@ public:
 	 */
 	void StopWav();
 
+#if 0	// REITEK: Disabled
 	/*! @Brief Allows JavaScript code to utilize BlabbleLogging
 	 */
 	void Log(int level, const std::string msg);
+#endif
 
 	// REITEK: Disable TLS flag (TLS is handled differently)
 #if 0
@@ -124,7 +126,7 @@ public:
 	 *  passed in should be in the range of 0 to 2 where 0 is mute and 1 is 
 	 *  no adjustment.
 	 */
-	void SetVolume(FB::variant outgoingVolume, FB::variant incomingVolume);
+	void SetVolume(FB::variant recVolume, FB::variant playVolume);
 
 	/*! @Brief Javascript function to get the current signal levels.
 	 *  This function returns a JavaScript object with "outgoingLevel"
@@ -151,9 +153,9 @@ public:
 
 	void setLogNumber(int number);
 
-	void setLogPath(std::string logPath);
+	bool setLogPath(std::string logPath);
 
-	void ZipSender(std::string host);
+	void logSender(std::string url);
 
 	void SetCodecPriority(std::string codec, int value);
 

@@ -165,6 +165,9 @@ BlabbleAccount::~BlabbleAccount()
 
 void BlabbleAccount::Destroy()
 {
+	std::string str = "DEBUG:                 +++BlabbleAccount::Destroy()+++";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
 	//Verify the manager is still around by grabbing it
 	PjsuaManagerPtr manager = pjsua_manager_.lock();
 	if (manager)
@@ -173,9 +176,21 @@ void BlabbleAccount::Destroy()
 			boost::recursive_mutex::scoped_lock lock(this->calls_mutex_);
 			BlabbleCallList::iterator it;
 
+			const size_t numCalls = calls_.size();
+
+			str = "DEBUG:                 Iterating at most on " + boost::lexical_cast<std::string>(numCalls) + " calls";
+			BlabbleLogging::blabbleLog(0, str.c_str(), 0);
+
+			size_t iterNum = 1;
+
 			while ((it = calls_.begin()) != calls_.end())
 			{
 				(*it)->LocalEnd();
+
+				iterNum++;
+				if (iterNum > numCalls) {
+					break;
+				}
 			}
 			calls_.clear();
 		}
@@ -187,6 +202,9 @@ void BlabbleAccount::Destroy()
 
 		manager->RemoveAccount(id_);
 	}
+
+	str = "DEBUG:                 ---BlabbleAccount::Destroy()---";
+	BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 }
 
 void BlabbleAccount::Unregister()

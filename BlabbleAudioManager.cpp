@@ -78,6 +78,12 @@ BlabbleAudioManager::BlabbleAudioManager(Blabble& pluginCore) :
 
 	std::string path;
 
+	/**
+	*	!!! NOTE: Using XP_WIN/XP_UNIX defines could be avoided
+	*
+	*	(See: boost::filesystem::path::preferred_separator)
+	*/
+
 #if defined(XP_WIN)
 	std::string appdata = getenv("ALLUSERSPROFILE");
 	path = appdata + "\\Mozilla\\Plugins";
@@ -94,6 +100,12 @@ BlabbleAudioManager::BlabbleAudioManager(Blabble& pluginCore) :
 		const std::string str = " INFO:                 " + std::string("Audio files path: ") + wav_path_;
 		BlabbleLogging::blabbleLog(0, str.c_str(), 0);
 	}
+
+	/**
+	*	!!! NOTE: Using XP_WIN/XP_UNIX defines could be avoided
+	*
+	*	(See: boost::filesystem::path::preferred_separator)
+	*/
 
 #if defined(XP_WIN)
 	default_ring_file_ = wav_path_ + "\\ringtone.wav";
